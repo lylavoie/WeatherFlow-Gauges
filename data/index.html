@@ -1,0 +1,249 @@
+<!--*******************************************************************
+    * WeatherFlow Tempest Gauges
+    * 
+    * Web controls and status for the WeatherFlow Tempest Gauges
+    * project implemented on the ESP32 platform.
+    *
+    * Copyright: Lincoln Lavoie, 2021
+    *******************************************************************-->
+<html>
+    <head>
+        <title>WeatherFlow Tempest Gauges</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <div id="menu">
+            <ul>
+                <li><a href="#" onclick="openTab(event, 'weather');" id="defaultOpen">Weather</a></li>
+                <li><a href="#" onclick="openTab(event, 'status');">Status</a></li>
+                <li><a href="#" onclick="openTab(event, 'settings');">Settings</a></li>
+                <li><a href="#" onclick="openTab(event, 'wifi');">Wi-Fi</a></li>
+                <li><a href="#" onclick="openTab(event, 'upgrade');">Upgrade</a></li>
+                <li><a href="#" onclick="logout();">Logout</a></li>
+            </ul>
+        </div>
+
+        <!-- Current Weather Conditions -->
+        <div id="weather" style="display: none;" class="tabcontent">
+            <h3>Current Conditions</h3>
+            <table id="tableWeatherStatus">
+                <tr>
+                    <td>Station Time</td>
+                    <td id="time">%CUR_TIME%</td>
+                </tr>
+                <tr>
+                    <td>Temperature</td>
+                    <td id="temperature">%CUR_TEMPERATURE%</td>
+                </tr>
+                <tr>
+                    <td>Relative Humidity</td>
+                    <td id="humidity">%CUR_HUMIDITY%</td>
+                </tr>
+                <tr>
+                    <td>Pressure</td>
+                    <td id="pressure">%CUR_PRESSURE%</td>
+                </tr>
+                <tr>
+                    <td>Wind Average</td>
+                    <td id="wind">%CUR_WIND%</td>
+                </tr>
+                <tr>
+                    <td>Wind Gust</td>
+                    <td id="wind_gust">%CUR_GUST%</td>
+                </tr>
+                <tr>
+                    <td>UV</td>
+                    <td id="uv">%CUR_UV%</td>
+                </tr>
+                <tr>
+                    <td>Brightness</td>
+                    <td id="brightness">%CUR_BRIGHTNESS%</td>
+                </tr>
+                <tr>
+                    <td>Solar Radiation</td>
+                    <td id="solar_radiation">%CUR_RADIATION%</td>
+                </tr>
+                <tr>
+                    <td>Precipitation Rate (previous 1 minute)</td>
+                    <td id="rain_rate">%CUR_RAIN_RATE%</td>
+                </tr>
+                <tr>
+                    <td>Precipitation Type</td>
+                    <td id="precipitation_type">%CUR_PRECIPITATION_TYPE%</td>
+                </tr>
+                <tr>
+                    <td>Lightning Strikes</td>
+                    <td id="lightning_strikes">%CUR_LIGHTNING_STRIKES%</td>
+                </tr>
+                <tr>
+                    <td>Lightning Distance</td>
+                    <td id="lightning_distance">%CUR_LIGHTNING_DISTANCE%</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- System Status -->
+        <div id="status" style="display: none;" class="tabcontent">
+            <h3>System Status</h3>
+            <table id="tableSystemStatuys">
+                <tr>
+                    <td>Wi-Fi Mode</td>
+                    <td id="wifi_mode">%WIFI_MODE%</td>
+                </tr>
+                <tr>
+                    <td>Wi-Fi Network</td>
+                    <td id="wifi_ssid">%WIFI_SSID%</td>
+                </tr>
+                <tr>
+                    <td>IP Address</td>
+                    <td id=wifi_ip_addr>%WIFI_IP_ADDR%</td>
+                </tr>
+                <tr>
+                    <td>Wi-Fi RSSI</td>
+                    <td id="wifi_rssi">%WIFI_RSSI%</td>
+                </tr>
+                <tr>
+                    <td>Battery Voltage</td>
+                    <td id="bat_volt">%BAT_VOLT%</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- System Settings -->
+        <div id="settings" style="display: block" class="tabcontent">
+            <h3>System Settings & Gauge Calibration</h3>
+            <form id="systemSettings" onsubmit="submitSystemSettings(event); return false;">
+                <!-- Wind Calibration Settings -->
+                <div>
+                    <div>
+                        <label for="min_wind">Wind Minimum Scale</label>
+                        <input type="text" id="min_wind" name="min_wind" placeholder="0" value="%MIN_WIND%" required pattern="\d+\.?\d*"/>
+                    </div>
+                    <div>
+                        <label for="max_wind">Wind Maximum Scale</label>
+                        <input type="text" id="max_wind" name="max_wind" placeholder="40" value="%MAX_WIND%" required pattern="\d+\.?\d*"/>
+                    </div>
+                    <div>
+                        <label for="step_wind">Wind Scale Step Size</label>
+                        <input type="text" id="step_wind" name="step_wind" placeholder="10" value="%STEP_WIND%" required pattern="\d+\.?\d*"/>
+                    </div>
+                    <div>
+                        <label for="gain_wind">Wind Gain Calibration</label>
+                        <input type="text" id="gain_wind" name="gain_wind" placeholder="1" value="%GAIN_WIND%" required pattern="\d+\.?\d*"/>
+                    </div>
+                    <div>
+                        <label for="threshold_wind">Wind LED Threshold</label>
+                        <input type="text" id="threshold_wind" name="threshold_wind" placeholder="1" value="%THRESHOLD_WIND%" required pattern="\d+\.?\d*"/>
+                    </div>
+                </div>  
+
+                <!-- Temp Calibration  Settings -->
+                <div>
+                    <div>
+                        <label for="min_temp">Temperature Minimum Scale</label>
+                        <input type="text" id="min_temp" name="min_temp" placeholder="-10" value="%MIN_TEMP%" required pattern="\-?\d+\.?\d*"/>
+                    </div>
+                    <div>
+                        <label for="max_temp">Temperature Maximum Scale</label>
+                        <input type="text" id="max_temp" name="max_temp" placeholder="110" value="%MAX_TEMP%" required pattern="\d+\.?\d*"/>
+                    </div>
+                    <div>
+                        <label for="step_temp">Temperature Scale Step Size</label>
+                        <input type="text" id="step_temp" name="step_temp" placeholder="15" value="%STEP_TEMP%" required pattern="\d+\.?\d*"/>
+                    </div>
+                    <div>
+                        <label for="gain_temp">Temperature Gain Calibration</label>
+                        <input type="text" id="gain_temp" name="gain_temp" placeholder="1" value="%GAIN_TEMP%" required pattern="\d+\.?\d*"/>
+                    </div>
+                </div>
+
+                <!-- Calibration Testing -->
+                <div>
+                    <div>
+                        <label for="cal_mode">Temperature Calibrate Mode</label>
+                        <select id="cal_mode" name="cal_mode" onchange="addFixedCalValueField(event);">
+                            <option value="range">Test Scale</option>
+                            <option value="fixed">Fixed Value</option>
+                            <option value="none" selected>None</option>
+                        </select>
+                    </div>
+                    <div id="cal_fixed_block" style="display: none;">
+                        <div>
+                            <label for="cal_fixed_wind">Wind Fixed Calibration Value</label>
+                            <input type="text" id="cal_fixed_wind" name="cal_fixed_wind" placeholder="10" value="10" required pattern="\d+\.?\d*"/>
+                        </div>
+                        <div>
+                            <label for="cal_fixed_temp">Temperature Fixed Calibration Value</label>
+                            <input type="text" id="cal_fixed_temp" name="cal_fixed_temp" placeholder="32" value="32" required pattern="\d+\.?\d*"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LED Settings -->
+                <div>
+                    <!-- FIXME: LED controls are TBD-->
+                </div>
+
+                <div>
+                    <button onclick="">Submit</button>
+                </div>
+            </form>
+            
+        </div>
+
+        <!-- Wi-Fi & Login Settings -->
+        <div id="wifi" style="display: none;" class="tabcontent">
+
+            <!-- Wi-Fi Settings -->
+            <h3>Wi-Fi Settings</h3>
+            <form id="wifiSettings" onsubmit="submitWiFi(event); return false;">
+                <div>
+                    <label for="ssid">Wireless Network</label>
+                    <input type="text" id="ssid" name="ssid" placeholder="%WIFI_SSID%"/>
+                </div>
+                <div>
+                    <label for="wifipass">Password</label>
+                    <input type="password" id="wifipass" name="wifiword" placeholder="****"/>
+                </div>
+                <div>
+                    <button type="submit" value="Submit">Submit</button>
+                </div>
+            </form>
+
+            <!-- User / Login settings -->
+            <h4>Login Settings</h4>
+            <form id="userSettings" onsubmit="submitLogin(event); return false;">
+                <div>
+                    <label for="username">Wireless Network</label>
+                    <input type="text" id="username" name="username" placeholder="%USERNAME%"/>
+                </div>
+                <div>
+                    <label form="userpassword">Password</label>
+                    <input type="password" id="userpass" name="userword" placeholder="****"/>
+                </div>
+                <div>
+                    <button type="submit" value="Submit">Submit</button>
+                </div>
+            </form>
+            
+        </div>
+
+        <!-- Upgrade -->
+        <div id="upgrade" style="display: none;" class="tabcontent">
+            <!-- FIXME: Make upgrades works -->
+            <h3>Upgrade Firmware</h3>
+            <form action="/update" method="POST">
+                <div id="update_file">
+                    <label for="update_src">Choose update image file</label>
+                    <input type="file" name="update_src" id="update_src"/>
+                </div>
+                <button type="submit" value="Submit">Update</button>
+            </form>
+        </div>
+
+        <script type="text/javascript" src="wxgauges.js"></script>
+        <script type="text/javascript" src="tabmenus.js"></script>
+        <script type="text/javascript">document.getElementById('defaultOpen').click();</script>
+    </body>
+</html>
