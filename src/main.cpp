@@ -11,6 +11,7 @@
 #include <Adafruit_MCP23X08.h>
 #include <SPIFFS.h>
 #include <Update.h>
+#include <esp_task_wdt.h>
 #include <map>
 
 // Version info
@@ -281,6 +282,12 @@ void setup() {
   // Start listening for UDP messages
   // ==================================================
   if( !UDPrcvr.begin(UDPPORT) )debug(1, "\n\rFailed to open UDP listening port!");
+
+  // ==================================================
+  // Enable the watchdog timer
+  // ==================================================
+  esp_task_wdt_init(10, false);
+  esp_task_wdt_add(NULL);
 }
 
 // ##################################################################
@@ -416,6 +423,12 @@ void loop() {
     // Cycle the DotStar color, just to give the user some feedback
     TP.DotStar_CycleColor(25);
   }
+
+  // ==================================================
+  // Watchdog timer reset
+  // ==================================================
+  if( ul32CurTime%5 == 0 )esp_task_wdt_reset();
+
 }
 
 // ##################################################################
