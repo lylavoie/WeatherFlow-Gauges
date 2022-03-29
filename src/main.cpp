@@ -12,6 +12,7 @@
 #include <SPIFFS.h>
 #include <Update.h>
 #include <esp_task_wdt.h>
+#include "wf.h"
 #include <map>
 
 // Version info
@@ -37,6 +38,9 @@ TinyPICO TP = TinyPICO();
 #define LED1CHANNEL 2
 #define LED2 15
 #define LED2CHANNEL 3
+
+// WeatherFlow Handler
+WeatherFlow WF(Imperial);
 
 // Hardware I2C GPIO extender
 Adafruit_MCP23X08 mcp;
@@ -83,18 +87,13 @@ void handleWebSocketMessage(AwsFrameInfo *info, uint8_t *data, size_t len);
 String webTemplateProcessor(const String& var);
 void webServerSpiffsHandler(AsyncWebServerRequest *request);
 
-// UDP receiver for WeatherFlow
-WiFiUDP UDPrcvr;
-#define UDPPORT 50222
-#define UDPRCRVSIZE 1460
-
 enum CalMode { none, fixed, range };
 CalMode CalibrationMode = none;
 
 // The weather (in variables)
-float fWindSpeedMph = 0;
-int iWindDirectionDegrees = 0;
-float fAirTempF = 0;
+//float fWindSpeedMph = 0;
+//int iWindDirectionDegrees = 0;
+//float fAirTempF = 0;
 
 
 
@@ -281,13 +280,14 @@ void setup() {
   // ==================================================
   // Start listening for UDP messages
   // ==================================================
-  if( !UDPrcvr.begin(UDPPORT) )debug(1, "\n\rFailed to open UDP listening port!");
+  if( !WF.Begin() )debug(1, "\n\rFailed to start WeatherFlow listener!");
 
   // ==================================================
   // Enable the watchdog timer
   // ==================================================
   esp_task_wdt_init(10, false);
   esp_task_wdt_add(NULL);
+  
 }
 
 // ##################################################################
@@ -295,8 +295,6 @@ void setup() {
 // ##################################################################
 
 void loop() {
-  static char chUdpBuffer[UDPRCRVSIZE]= {0};
-  DynamicJsonDocument jsonMsg(UDPRCRVSIZE);
   static uint32_t u32WindPwm;
   static uint32_t u32TempPwm;
   static uint8_t u8WindDir;
@@ -312,6 +310,7 @@ void loop() {
   // ==============================================================
   // Calibration modes
   // ==============================================================
+  /*
   if( CalibrationMode == range ){
     debug(1, "\n\rWind is %f Mph at %i degrees.", fWindSpeedMph, iWindDirectionDegrees);
     u32WindPwm = scalePwmOutput(fWindSpeedMph, SystemConfig.WindConfig.min, SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
@@ -338,28 +337,37 @@ void loop() {
     delay(3000);
     return;
   }
+  */
 
+  /*
   if( CalibrationMode == fixed ){
-    fWindSpeedMph = 30;
-    debug(1, "\n\rWind is %f Mph at %i degrees.", fWindSpeedMph, iWindDirectionDegrees);
-    u32WindPwm = scalePwmOutput(fWindSpeedMph, SystemConfig.WindConfig.min, SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
+    //debug(1, "\n\rWind is %f Mph at %i degrees.", fWindSpeedMph, iWindDirectionDegrees);
+    //u32WindPwm = scalePwmOutput(fWindSpeedMph, SystemConfig.WindConfig.min, SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
     debug(2, "\n\rWind PWM: %i", u32WindPwm);
     ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
 
-    fAirTempF = 80;
-    debug(1, "\n\rAir temp is %f degrees F.", fAirTempF);\
-    u32TempPwm = scalePwmOutput(fAirTempF, SystemConfig.TempConfig.min, SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
+    //debug(1, "\n\rAir temp is %f degrees F.", fAirTempF);\
+    //u32TempPwm = scalePwmOutput(fAirTempF, SystemConfig.TempConfig.min, SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
     debug(2, "\n\rTemp PWM: %i", u32TempPwm);
     ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
 
     delay(5000);
     return;
   }
+  */
+  
+  if( bSoftApActive ){
+    // ================================================================
+    // Wi-Fi in AP mode, allowing for user setup...
+    // ================================================================
+    // Cycle the DotStar color, just to give the user some feedback
+    TP.DotStar_CycleColor(25);
+  }
+  else{
+    // ================================================================
+    // Wi-Fi in client mode, listening for WeatherFlow messages
+    // ================================================================
 
-  // ================================================================
-  // Wi-Fi in client mode, listening for WeatherFlow messages
-  // ================================================================
-  if( !bSoftApActive ){
     // Status via DotStar LED
     if( ul32CurTime%15 == 0 ){
       TP.DotStar_SetPixelColor(0x00FF00);
@@ -367,52 +375,41 @@ void loop() {
     }
     if( ul32CurTime - ul32LastBlink >= 1 )TP.DotStar_SetPixelColor(0x0);
 
-    // Check if we received a packet
-    if( UDPrcvr.parsePacket() ){
-      debug(2, "\n\rReceived a packet...");
-      UDPrcvr.read(chUdpBuffer, UDPRCRVSIZE);
-      debug(4, "\n\rPacket:\n\r  %s", chUdpBuffer);
-      if( deserializeJson(jsonMsg, chUdpBuffer) == DeserializationError::Ok){
-        debug(2, "\n\rJSON ok...");
-        const char *obsType = jsonMsg["type"];
-        const std::map<std::string,int> mapMsgTypes { {"rapid_wind", 1}, {"obs_st", 2} };
-        switch ( mapMsgTypes.find(std::string(obsType))->second )
-        {
-        case 1:{
-          debug(2, "\n\rReceived rapid_wind type");
-          fWindSpeedMph = jsonMsg["ob"][1];
-          iWindDirectionDegrees = jsonMsg["ob"][2];
-          debug(1, "\n\rWind is %f Mph at %i degrees.", fWindSpeedMph, iWindDirectionDegrees);
-          u32WindPwm = scalePwmOutput(fWindSpeedMph, SystemConfig.WindConfig.min, SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
-          debug(2, "\n\rWind PWM: %i", u32WindPwm);
-          ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
-          if( fWindSpeedMph >= SystemConfig.WindConfig.threshold ){ u8WindDir = encodeWind(iWindDirectionDegrees); }
-          else{ u8WindDir = 0x00; }
-          debug(2, "\n\rWind direction code: 0x%02X", u8WindDir);
-          mcp.writeGPIO(u8WindDir, 0);
-        }
-          break;
-        
-        case 2:{
-          debug(2, "\n\rReceived obs_st type");
-          float fAirTempC = jsonMsg["obs"][0][7];
-          fAirTempF = 32 + 9*fAirTempC/5;
-          debug(1, "\n\rAir temp is %f degrees F.", fAirTempF);
-          u32TempPwm = scalePwmOutput(fAirTempF, SystemConfig.TempConfig.min, SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
-          debug(2, "\n\rTemp PWM: %i", u32TempPwm);
-          ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
-          }
-          break;
+    // WeatherFlow receiver loop function call, return indicates new data
+    // is available
+    if( WF.ReceiveLoop() ){
+      debug(1, "\n\rReceived updated weather info...");
+      
+      // Check for Wind data
+      if( WF.RapidWind()->Valid() ){
+        debug(1, "\n\rValid Rapid Wind data:");
+        debug(1, "\n\rWind Speed: %f", WF.RapidWind()->WindSpeed());
+        debug(1, "\n\rWind Direction: %d", WF.RapidWind()->WindDirection());
 
-        default:{
-          debug(3, "\n\rMessage type (%s) is a don't care", obsType);
-          }
-          break;
+        u32WindPwm = scalePwmOutput(WF.RapidWind()->WindSpeed(), SystemConfig.WindConfig.min,
+          SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
+        debug(2, "\n\rWind PWM: %i", u32WindPwm);
+        ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
+
+        if( WF.RapidWind()->WindSpeed() >= SystemConfig.WindConfig.threshold ){ 
+          u8WindDir = encodeWind(WF.RapidWind()->WindDirection()); 
         }
+        else{ 
+          u8WindDir = 0x00;
+        }
+        debug(2, "\n\rWind direction code: 0x%02X", u8WindDir);
+        mcp.writeGPIO(u8WindDir, 0);
       }
 
-      // Zero out our buffer, so we're good for the next UDP packet
-      memset(chUdpBuffer, 0, UDPRCRVSIZE);
+      // Check for valid Station data
+      if( WF.ObservationTempest()->Valid() ){
+        debug(1, "\n\rValid Station Observation data:");
+        debug(1, "\n\rAir Temperature: %f", WF.ObservationTempest()->AirTemperature());
+        u32TempPwm = scalePwmOutput(WF.ObservationTempest()->AirTemperature(), SystemConfig.TempConfig.min,
+          SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
+        debug(2, "\n\rTemp PWM: %i", u32TempPwm);
+        ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
+      }
     }
   }
 
@@ -526,7 +523,7 @@ uint32_t scalePwmOutput(float dataVal, float minScale, float maxScale, float gai
 uint8_t encodeWind(int windDir){
   uint8_t u8WindDir;
 
-  if( windDir >= (int)348.75 || windDir < (int)11.25 ){ u8WindDir = 0x01; debug(3,"\n\rWind Dir: N"); }               // N
+  if( windDir >= (int)348.75 || windDir < (int)11.25 ){ u8WindDir = 0x01; debug(3,"\n\rWind Dir: N"); }         // N
   else if( windDir >= (int)11.25 && windDir < (int)33.75 ){ u8WindDir = 0x03; debug(3,"\n\rWind Dir: NNE"); }   // NNE
   else if( windDir >= (int)33.75 && windDir < (int)56.25 ){ u8WindDir = 0x02; debug(3,"\n\rWind Dir: NE"); }    // NE
   else if( windDir >= (int)56.25 && windDir < (int)78.75 ){ u8WindDir = 0x06; debug(3,"\n\rWind Dir: ENE"); }   // ENE
@@ -612,8 +609,8 @@ void handleWebSocketMessage(AwsFrameInfo *info, uint8_t *data, size_t len){
             jsonSettings["temp"] = jsonWsMsg["payload"]["temp"];
             if( strcmp("fixed", jsonWsMsg["payload"]["cal"]["mode"]) == 0 ){
               CalibrationMode = fixed;
-              fAirTempF = jsonWsMsg["payload"]["cal"]["cal_fixed_temp"];
-              fWindSpeedMph = jsonWsMsg["payload"]["cal"]["cal_fixed_wind"];
+              //fAirTempF = jsonWsMsg["payload"]["cal"]["cal_fixed_temp"];
+              //fWindSpeedMph = jsonWsMsg["payload"]["cal"]["cal_fixed_wind"];
             }
             if( strcmp("range", jsonWsMsg["payload"]["cal"]["mode"]) == 0 ){
               CalibrationMode = range;
