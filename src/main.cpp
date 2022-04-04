@@ -14,24 +14,29 @@
 #include <esp_task_wdt.h>
 #include "wf.h"
 #include <map>
+#include <ctime>
+
+// Note, these are required because of https://community.platformio.org/t/identifier-is-undefined-setenv-tzset/16162/2
+_VOID  _EXFUN(tzset,	(_VOID));
+int	_EXFUN(setenv,(const char *__string, const char *__value, int __overwrite));
 
 // Version info
 #define MAJOR 1
-#define MINOR 0
+#define MINOR 1
 #define PATCH 0
 
 // Debug Info
 #define DEBUG 1
-int debug(int level, const char *fmt, ...);
+void debug(int level, const char *fmt, ...);
 
 // Hardware board
 TinyPICO TP = TinyPICO();
 // Output Guages
-#define WINDGUAGEPIN 25
+#define WINDGAUGEPIN 25
 #define WINDCHANNEL 0
-#define TEMPGUAGEPIN 26
+#define TEMPGAUGEPIN 26
 #define TEMPCHANNEL 1
-// Input Settings
+// Input/Output Settings
 #define BTNPIN1 33
 #define BTNPIN2 32
 #define LED1 27
@@ -90,12 +95,6 @@ void webServerSpiffsHandler(AsyncWebServerRequest *request);
 enum CalMode { none, fixed, range };
 CalMode CalibrationMode = none;
 
-// The weather (in variables)
-//float fWindSpeedMph = 0;
-//int iWindDirectionDegrees = 0;
-//float fAirTempF = 0;
-
-
 
 // ##################################################################
 // # Setup
@@ -146,6 +145,13 @@ void setup() {
     }
     delay(500);
   }
+
+  // ==================================================
+  // Environment Startup
+  // ==================================================
+  // FIXME: Include the time-zone config in ConfigSettings
+  setenv("TZ", "EST+5EDT,M3.2.0/2,M11.1.0/2", true);
+  tzset();
 
   // ==================================================
   // Wi-Fi Startup
@@ -257,11 +263,11 @@ void setup() {
   
   // Wind PWM freq 5 kHz, 13-bit timer resolution
   ledcSetup(WINDCHANNEL, 5000, 13);
-  ledcAttachPin(WINDGUAGEPIN, WINDCHANNEL);
+  ledcAttachPin(WINDGAUGEPIN, WINDCHANNEL);
 
   // Temp PWM freq 5 kHz, 13-bit timer resolution
   ledcSetup(TEMPCHANNEL, 5000, 13);
-  ledcAttachPin(TEMPGUAGEPIN, TEMPCHANNEL);
+  ledcAttachPin(TEMPGAUGEPIN, TEMPCHANNEL);
 
   // LED PWM Setup, 5 kHz, 13-bit timer
   ledcSetup(LED1CHANNEL, 5000, 13);
@@ -300,6 +306,8 @@ void loop() {
   static uint8_t u8WindDir;
   time_t ul32CurTime;
   static time_t ul32LastBlink;
+  static bool bOneShot = false;
+  static bool bGaugeLamp = false;
 
   // Get the current time
   time(&ul32CurTime);
@@ -338,23 +346,6 @@ void loop() {
     return;
   }
   */
-
-  /*
-  if( CalibrationMode == fixed ){
-    //debug(1, "\n\rWind is %f Mph at %i degrees.", fWindSpeedMph, iWindDirectionDegrees);
-    //u32WindPwm = scalePwmOutput(fWindSpeedMph, SystemConfig.WindConfig.min, SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
-    debug(2, "\n\rWind PWM: %i", u32WindPwm);
-    ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
-
-    //debug(1, "\n\rAir temp is %f degrees F.", fAirTempF);\
-    //u32TempPwm = scalePwmOutput(fAirTempF, SystemConfig.TempConfig.min, SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
-    debug(2, "\n\rTemp PWM: %i", u32TempPwm);
-    ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
-
-    delay(5000);
-    return;
-  }
-  */
   
   if( bSoftApActive ){
     // ================================================================
@@ -369,11 +360,20 @@ void loop() {
     // ================================================================
 
     // Status via DotStar LED
-    if( ul32CurTime%15 == 0 ){
+    if( ul32CurTime%15 == 0 && !bOneShot ){
+      bOneShot = true;
       TP.DotStar_SetPixelColor(0x00FF00);
       ul32LastBlink = ul32CurTime;
+      // Log the current time
+      char buf[128];
+      strftime(buf, 128, "%c", localtime(&ul32CurTime));
+      debug(1, "\n\rCurrent System Time: %s", buf); 
+      debug(1, "\r\nFirmware Version: %d.%d.%d", MAJOR, MINOR, PATCH);
     }
-    if( ul32CurTime - ul32LastBlink >= 1 )TP.DotStar_SetPixelColor(0x0);
+    if( ul32CurTime - ul32LastBlink >= 1 ){
+      bOneShot = false;
+      TP.DotStar_SetPixelColor(0x0);
+    }
 
     // WeatherFlow receiver loop function call, return indicates new data
     // is available
@@ -381,35 +381,60 @@ void loop() {
       debug(1, "\n\rReceived updated weather info...");
       
       // Check for Wind data
-      if( WF.RapidWind()->Valid() ){
+      if( WF.RapidWind().Valid() ){
         debug(1, "\n\rValid Rapid Wind data:");
-        debug(1, "\n\rWind Speed: %f", WF.RapidWind()->WindSpeed());
-        debug(1, "\n\rWind Direction: %d", WF.RapidWind()->WindDirection());
+        debug(1, "\n\r\tWind Speed: %f", WF.RapidWind().WindSpeed());
+        debug(1, "\n\r\tWind Direction: %d", WF.RapidWind().WindDirection());
 
-        u32WindPwm = scalePwmOutput(WF.RapidWind()->WindSpeed(), SystemConfig.WindConfig.min,
+        u32WindPwm = scalePwmOutput(WF.RapidWind().WindSpeed(), SystemConfig.WindConfig.min,
           SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
-        debug(2, "\n\rWind PWM: %i", u32WindPwm);
+        debug(2, "\n\r\tWind PWM: %i", u32WindPwm);
         ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
 
-        if( WF.RapidWind()->WindSpeed() >= SystemConfig.WindConfig.threshold ){ 
-          u8WindDir = encodeWind(WF.RapidWind()->WindDirection()); 
+        if( WF.RapidWind().WindSpeed() >= SystemConfig.WindConfig.threshold ){ 
+          u8WindDir = encodeWind(WF.RapidWind().WindDirection()); 
         }
         else{ 
           u8WindDir = 0x00;
         }
-        debug(2, "\n\rWind direction code: 0x%02X", u8WindDir);
+        debug(2, "\n\r\tWind direction code: 0x%02X", u8WindDir);
         mcp.writeGPIO(u8WindDir, 0);
+
+        // Check if we need to update our system time
+        if( abs(time(NULL) - WF.RapidWind().EpochTime()) > 10 ){
+          debug(1, "\n\r\tUpdating the system time...");
+          timeval WFtime;
+          WFtime.tv_sec = WF.RapidWind().EpochTime();
+          WFtime.tv_usec = 0;
+          settimeofday(&WFtime, NULL);
+          debug(2, "\n\r\t\tWF Epoch Time: %d", WF.RapidWind().EpochTime());
+          debug(2, "\n\r\t\tSystem Time:   %d", time(NULL));
+        }
       }
 
       // Check for valid Station data
-      if( WF.ObservationTempest()->Valid() ){
+      if( WF.ObservationTempest().Valid() ){
         debug(1, "\n\rValid Station Observation data:");
-        debug(1, "\n\rAir Temperature: %f", WF.ObservationTempest()->AirTemperature());
-        u32TempPwm = scalePwmOutput(WF.ObservationTempest()->AirTemperature(), SystemConfig.TempConfig.min,
+        debug(1, "\n\r\tAir Temperature: %f", WF.ObservationTempest().AirTemperature());
+        u32TempPwm = scalePwmOutput(WF.ObservationTempest().AirTemperature(), SystemConfig.TempConfig.min,
           SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
-        debug(2, "\n\rTemp PWM: %i", u32TempPwm);
+        debug(2, "\n\r\tTemp PWM: %i", u32TempPwm);
         ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
       }
+    }
+  
+    // Check our current time, turn on the gauge lamps if needed
+    tm *tmCurrentTime;
+    tmCurrentTime = localtime(&ul32CurTime);
+    // FIXME: Add on / off settings to ConfigSettings
+    if( !bGaugeLamp && tmCurrentTime->tm_hour == 19 && tmCurrentTime->tm_min == 0 ){
+      bGaugeLamp = true;
+      // FIXME: Add Gauge Lamp brightness to ConfigSettings
+      ledcAnalogWrite(LED1CHANNEL, scalePwmOutput(100, 0, 100, 1));
+    }
+    if( bGaugeLamp && tmCurrentTime->tm_hour == 7 && tmCurrentTime->tm_min == 0 ){
+      bGaugeLamp = false;
+      ledcAnalogWrite(LED1CHANNEL, 0);
     }
   }
 
@@ -428,27 +453,24 @@ void loop() {
 
 }
 
-// ##################################################################
+// ##################################################################dd
 // # Debug printer
 // #
 // # Debug logging to the serial port, message is only printed if 
 // # the level is >= to DEBUG (i.e. debugging level).  If DEBUG is
 // # undefined, code is deactivated.
 // ##################################################################
-int debug(int level, const char *fmt, ...){
+void debug(int level, const char *fmt, ...){
   #ifdef DEBUG
   if( level <= DEBUG ){
-    int iNumChar = 0;
     char chBuffer[256];
     va_list args;
     va_start(args,fmt);
-    iNumChar = vsprintf(chBuffer, fmt, args);
+    vsprintf(chBuffer, fmt, args);
     va_end(args);
     Serial.print(chBuffer);
-    return iNumChar;
   }
   #endif
-  return 0;
 }
 
 // ##################################################################

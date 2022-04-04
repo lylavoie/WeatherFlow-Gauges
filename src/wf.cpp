@@ -1,3 +1,40 @@
+/**
+ * WeatherFlow Tempest UDP API v171
+ * 
+ * Copyright: Lincoln Lavoie, lincoln.lavoie@gmail.com, 2022
+ * 
+ * License: Apache License v2.0
+ * 
+ * Implements a UDP receiver for WeatherFlow Tempest UDP messages
+ * for the Tempest, Sky, and AIR weather stations and receiviers.
+ * 
+ * Usage:
+ * 1. Begin() method should be called once to setup the UDP receiver,
+ *    only after the Wi-Fi connect has been established.
+ * 2. ReceiveLoop() method should be called within the main Loop() to,
+ *    check for new UDP messages.  The return code from this method
+ *    can be used to determine is new data is available.
+ * 3. Sub-classes are available for each message type that may be
+ *    received.  Each class included a read-only Valid() property
+ *    that will be set to true once the object contains value data.
+ * 4. Changing the units of the WeatherFlow() object will reset all
+ *    available data (i.e. all Valid() properties will be set to 
+ *    false for all sub-classes).
+ *
+ * 
+ * Notes:
+ * 1. Class design should allow for future version of the API, assuming
+ *    only new parameters are added and new values are only added to the
+ *    end of the array.
+ * 2. The design assumes only 1 reporting station of each time (i.e. two 
+ *    Tempest units connected to 1 Hub is not currenly supported).
+ * 3. The design assumes the complete JSON message payload is contained
+ *    in a single UDP payload (i.e. no message fragmentation).
+ * 4. If constructed with the default WeatherFlow(), the units are set to
+ *    Imperial (US) units.
+ * 
+ */
+
 #include "wf.h"
 #include <WiFiUdp.h>
 #include <ArduinoJson.h>
@@ -7,6 +44,21 @@
 /  Rain Start Event Class
 /
 /  *********************************************/
+wfRainStartEvent::wfRainStartEvent(){ 
+    ulTimeEpoch = 0;
+    units = Imperial;
+    valid = false;
+    strSerialNumber.clear();
+    strHubSerialNumber.clear();
+}
+
+wfRainStartEvent::wfRainStartEvent(wfUnits u){
+    units = u;
+    ulTimeEpoch = 0;
+    valid = false;
+    strSerialNumber.clear();
+    strHubSerialNumber.clear(); 
+}
 
 // Parse the JSON message for the event data.
 bool wfRainStartEvent::ParseMsg(JsonDocument& jsonMsg){
@@ -20,7 +72,7 @@ bool wfRainStartEvent::ParseMsg(JsonDocument& jsonMsg){
     for( JsonVariant RainStart : jsonMsg["evt"].as<JsonArray>() ){
         switch(count){
             case 0:{
-                this->ulTimeEpoch = RainStart.as<unsigned long>();
+                this->ulTimeEpoch = RainStart.as<time_t>();
             }
             break;
             default:{
@@ -32,14 +84,33 @@ bool wfRainStartEvent::ParseMsg(JsonDocument& jsonMsg){
         count++;
     }
     // Quick check that all parts of the message array were received.
-    if( count == 1 ){ valid = true; return true; }
+    if( count >= 1 ){ valid = true; return true; }
     else { valid = false; return false; }
 }
+
+
 
 /* *********************************************
 /  Lightning Strike Event Class
 /
 /  *********************************************/
+wfLightningStrikeEvent::wfLightningStrikeEvent(){ 
+    units = Imperial;
+    uiEnergy = 0;
+    fDistance = 0;
+    valid = false;
+    strSerialNumber.clear();
+    strHubSerialNumber.clear();
+}
+
+wfLightningStrikeEvent::wfLightningStrikeEvent(wfUnits u){ 
+    units = u;
+    uiEnergy = 0;
+    fDistance = 0;
+    valid = false;
+    strSerialNumber.clear();
+    strHubSerialNumber.clear();
+}
 
 // Parse the JSON message for the strike data.
 bool wfLightningStrikeEvent::ParseMsg(JsonDocument& jsonMsg){
@@ -53,7 +124,7 @@ bool wfLightningStrikeEvent::ParseMsg(JsonDocument& jsonMsg){
     for( JsonVariant LightningStrike : jsonMsg["evt"].as<JsonArray>() ){
         switch(count){
             case 0:{
-                this->ulTimeEpoch = LightningStrike.as<unsigned long>();
+                this->ulTimeEpoch = LightningStrike.as<time_t>();
             }
             break;
             case 1:{
@@ -73,7 +144,7 @@ bool wfLightningStrikeEvent::ParseMsg(JsonDocument& jsonMsg){
         count++;
     }
     // Quick check that all parts of the message array were received.
-    if( count == 3 ){ valid = true; return true; }
+    if( count >= 3 ){ valid = true; return true; }
     else { valid = false; return false; }
 }
 
@@ -92,10 +163,31 @@ float wfLightningStrikeEvent::Distance(void){
     }
 }
 
+
+
 /* *********************************************
 /  Rapid Wind Class
 /
 /  *********************************************/
+wfRapidWind::wfRapidWind(){
+    units = Imperial;
+    ulTimeEpoch = 0;
+    fWindSpeed = 0;
+    uiWindDirection = 0;
+     valid = false;
+     strSerialNumber.clear();
+     strHubSerialNumber.clear();
+}
+
+wfRapidWind::wfRapidWind(wfUnits u){
+    units = u;
+    ulTimeEpoch = 0;
+    fWindSpeed = 0;
+    uiWindDirection = 0;
+     valid = false;
+     strSerialNumber.clear();
+     strHubSerialNumber.clear();
+}
 
 // Parse the JSON message for the rapid wind data.
 bool wfRapidWind::ParseMsg(JsonDocument& jsonMsg){
@@ -109,7 +201,7 @@ bool wfRapidWind::ParseMsg(JsonDocument& jsonMsg){
     for( JsonVariant RapidWind : jsonMsg["ob"].as<JsonArray>() ){
         switch(count){
             case 0:{
-                this->ulTimeEpoch = RapidWind.as<unsigned long>();
+                this->ulTimeEpoch = RapidWind.as<time_t>();
             }
             break;
             case 1:{
@@ -129,7 +221,7 @@ bool wfRapidWind::ParseMsg(JsonDocument& jsonMsg){
         count++;
     }
     // Quick check that all parts of the message array were received.
-    if( count == 3 ){ valid = true; return true; }
+    if( count >= 3 ){ valid = true; return true; }
     else { valid = false; return false; }
 }
 
@@ -149,11 +241,340 @@ float wfRapidWind::WindSpeed(){
 }
 
 
+
+/* *********************************************
+/  Observation AIR Class
+/
+/  *********************************************/
+wfObservationAir::wfObservationAir(){
+    units = Imperial;
+    this->init();
+}
+
+wfObservationAir::wfObservationAir(wfUnits u){
+    units = u;
+    this->init();
+}
+
+void wfObservationAir::init(void){
+    strSerialNumber.clear() ;
+    strHubSerialNumber.clear();
+    uiFirmwareVersion = 0;
+    ulTimeEpoch = 0;
+    fStationPressure = 0;
+    fAirTemp = 0;
+    fRelativeHumidity = 0;
+    uiLightningStrikeCount =0;
+    fLightningStrikeAvgDistance = 0;
+    fBatteryVoltage = 0;
+    uiReportInterval = 0;
+    valid = false;
+}
+
+// Parse the JSON message for the station data.
+bool wfObservationAir::ParseMsg(JsonDocument& jsonMsg){
+    // Check that we've good the right message components
+    if( !jsonMsg.containsKey("obs") ){
+        valid = false;
+        return false;
+    };
+
+    // Station info (serial numbers, firmware, etc.)
+    strSerialNumber = jsonMsg["serial_number"].as<String>();
+    strHubSerialNumber = jsonMsg["hub_sn"].as<String>();
+    uiFirmwareVersion = jsonMsg["firmware_revision"].as<unsigned int>();
+
+
+    // Parse the message array
+    uint8_t count = 0; 
+    for( JsonVariant AirObs : jsonMsg["obs"][0].as<JsonArray>() ){
+        switch(count){
+            case 0: this->ulTimeEpoch = AirObs.as<time_t>();
+            break;
+            case 1: this->fStationPressure = AirObs.as<float>();
+            break;
+            case 2: this->fAirTemp = AirObs.as<float>();
+            break;
+            case 3: this->fRelativeHumidity = AirObs.as<float>();
+            break;
+            case 4: this->uiLightningStrikeCount = AirObs.as<unsigned int>();
+            break;
+            case 5: this->fLightningStrikeAvgDistance = AirObs.as<float>();
+            break;
+            case 6: this->fBatteryVoltage = AirObs.as<float>();
+            break;
+            case 7: this->uiReportInterval = AirObs.as<unsigned int>();
+            break;
+            default:{
+                valid = false;
+                return false;
+            }
+            break;
+        }
+        count++;
+    }
+
+    // Quick check that all parts of the message array were received.
+    if( count >= 8 ){ valid = true; return true; }
+    else { valid = false; return false; }
+}
+
+// Station Pressure in one fo the following units:
+// Imperial - inches of mercury
+// Metric - millibar
+float wfObservationAir::StationPressure(void){
+    switch (units){
+        case Imperial:
+            return fStationPressure / 33.864; 
+            break;
+        default:  // Metric
+            return fStationPressure;
+            break;
+    }
+}
+
+// Air Temperature in one fo the following units:
+// Imperial - Fahrenheit
+// Metric - Celsius
+float wfObservationAir::AirTemperature(void){
+    switch (units){
+        case Imperial:
+            return (fAirTemp * (9/5)) + 32; 
+            break;
+        default:  // Metric
+            return fAirTemp;
+            break;
+    }
+}
+
+// Average distance to lightning strikes in the following units:
+// Imperial - miles
+// Metric - kilometers
+float wfObservationAir::LightningStrikeAvgDistance(void){
+    switch (units){
+        case Imperial:
+            return fLightningStrikeAvgDistance / 1.609; 
+            break;
+        default:  // Metric
+            return fLightningStrikeAvgDistance;
+            break;
+    }
+}
+
+
+
 /* *********************************************
 /  Observation Tempest Class
 /
 /  *********************************************/
+wfObservationSky::wfObservationSky(){
+    units = Imperial;
+    this->init();
+}
+
+wfObservationSky::wfObservationSky(wfUnits u){
+    units = u;
+    this->init();
+}
+
+void wfObservationSky::init(void){
+    strSerialNumber.clear();
+    strHubSerialNumber.clear();
+    uiFirmwareVersion = 0;
+    ulTimeEpoch = 0;
+    fIlluminance = 0;
+    uiUv = 0 ;
+    fRainOverPrevMin = 0;
+    fWindLull = 0;
+    fWindAverage = 0;
+    fWindGust = 0;
+    uiWindDirection = 0;
+    fBatteryVoltage = 0;
+    uiReportInterval = 0;
+    fSolarRadiation = 0;
+    fLocalDayRainAccumulation = 0;
+    uiParticipationType = 0;
+    uiWindSampleInterval = 0;
+    valid = false;
+}
+
+// Parse the JSON message for the station data.
+bool wfObservationSky::ParseMsg(JsonDocument& jsonMsg){
+    // Check that we've good the right message components
+    if( !jsonMsg.containsKey("obs") ){
+        valid = false;
+        return false;
+    };
+
+    // Station info (serial numbers, firmware, etc.)
+    strSerialNumber = jsonMsg["serial_number"].as<String>();
+    strHubSerialNumber = jsonMsg["hub_sn"].as<String>();
+    uiFirmwareVersion = jsonMsg["firmware_revision"].as<unsigned int>();
+
+    // Parse the message array
+    uint8_t count = 0; 
+    for( JsonVariant SkyObs : jsonMsg["obs"][0].as<JsonArray>() ){
+        switch(count){
+            case 0: this->ulTimeEpoch = SkyObs.as<time_t>();
+            break;
+            case 1: this->fIlluminance = SkyObs.as<float>();
+            break;
+            case 2: this->uiUv = SkyObs.as<unsigned int>();
+            break;
+            case 3: this->fRainOverPrevMin = SkyObs.as<float>();
+            break;
+            case 4: this->fWindLull = SkyObs.as<float>();
+            break;
+            case 5: this->fWindAverage = SkyObs.as<float>();
+            break;
+            case 6: this->fWindGust = SkyObs.as<float>();
+            break;
+            case 7: this->uiWindDirection = SkyObs.as<unsigned int>();
+            break;
+            case 8: this->fBatteryVoltage = SkyObs.as<float>();
+            break;
+            case 9: this->uiReportInterval = SkyObs.as<unsigned int>();
+            break;
+            case 10: this->fSolarRadiation = SkyObs.as<float>();
+            break;
+            case 11: this->fLocalDayRainAccumulation = SkyObs.as<float>();
+            break;
+            case 12: this->uiParticipationType = SkyObs.as<unsigned int>();
+            break;
+            case 13: this->uiWindSampleInterval = SkyObs.as<unsigned int>();
+            break;
+            default:{
+                valid = false;
+                return false;
+            }
+            break;
+        }
+        count++;
+    }
+
+    // Quick check that all parts of the message array were received.
+    if( count >= 14 ){ valid = true; return true; }
+    else { valid = false; return false; }
+}
+
+// Illuminance in one of the following units:
+// Imperial - foot-candle
+// Metric - Lux
+float wfObservationSky::Illuminance(void){
+    switch (units){
+        case Imperial:
+            return fIlluminance / 10.764; 
+            break;
+        default:  // Metric
+            return fIlluminance;
+            break;
+    }
+}
+
+// Rain amount observed over the past one minute in the following:
+// Imperial - inches
+// Metric - millimeters
+float wfObservationSky::RainOverPreviousMinute(void){
+    switch (units){
+        case Imperial:
+            return fRainOverPrevMin / 25.4; 
+            break;
+        default:  // Metric
+            return fRainOverPrevMin;
+            break;
+    }
+}
+
+// Average Wind Speed in one of the following units:
+// Imperial - miles per hour
+// Metric - meters per second
+float wfObservationSky::WindAverage(void){
+    switch (units){
+        case Imperial:
+            return fWindAverage * 2.237; 
+            break;
+        default:  // Metric
+            return fWindAverage;
+            break;
+    }
+}
+
+// Wind Lull Speed in one of the following units:
+// Imperial - miles per hour
+// Metric - meters per second
+float wfObservationSky::WindLull(void){
+    switch (units){
+        case Imperial:
+            return fWindLull * 2.237; 
+            break;
+        default:  // Metric
+            return fWindLull;
+            break;
+    }
+}
+
+// Wind Gust Speed in one of the following units:
+// Imperial - miles per hour
+// Metric - meters per second
+float wfObservationSky::WindGust(void){
+    switch (units){
+        case Imperial:
+            return fWindGust * 2.237; 
+            break;
+        default:  // Metric
+            return fWindGust;
+            break;
+    }
+}
+
+// Solar Radiation in one of the following units:
+// Imperial - Watts per square foot
+// Metric - Watts per square meter
+float wfObservationSky::SolarRadiation(void){
+    switch (units){
+        case Imperial:
+            return fSolarRadiation / 10.764; 
+            break;
+        default:  // Metric
+            return fSolarRadiation;
+            break;
+    }
+}
+
+// Rain amount observed over the past local day:
+// Imperial - inches
+// Metric - millimeters
+float wfObservationSky::LocalDayRainAccumulation(void){
+    switch (units){
+        case Imperial:
+            return fLocalDayRainAccumulation / 25.4; 
+            break;
+        default:  // Metric
+            return fLocalDayRainAccumulation;
+            break;
+    }
+}
+
+
+
+/* *********************************************
+/  Observation Tempest Class
+/
+/  *********************************************/
+wfObservationTempest::wfObservationTempest(){
+    units = Imperial;
+    this->init();
+}
+
+wfObservationTempest::wfObservationTempest(wfUnits u){
+    units = u;
+    this->init();
+}
+
 void wfObservationTempest::init(void){
+    strSerialNumber.clear();
+    strHubSerialNumber.clear();
+    uiFirmwareVersion = 0;
     ulTimeEpoch = 0;
     fWindLull = 0;
     fWindAverage = 0;
@@ -182,11 +603,17 @@ bool wfObservationTempest::ParseMsg(JsonDocument& jsonMsg){
         valid = false;
         return false;
     };
+
+    // Station info (serial numbers, firmware, etc.)
+    strSerialNumber = jsonMsg["serial_number"].as<String>();
+    strHubSerialNumber = jsonMsg["hub_sn"].as<String>();
+    uiFirmwareVersion = jsonMsg["firmware_revision"].as<unsigned int>();
+
     // Parse the message array
     uint8_t count = 0; 
     for( JsonVariant TempestObs : jsonMsg["obs"][0].as<JsonArray>() ){
         switch(count){
-            case 0: this->ulTimeEpoch = TempestObs.as<unsigned long>();
+            case 0: this->ulTimeEpoch = TempestObs.as<time_t>();
             break;
             case 1: this->fWindLull = TempestObs.as<float>();
             break;
@@ -230,8 +657,9 @@ bool wfObservationTempest::ParseMsg(JsonDocument& jsonMsg){
         }
         count++;
     }
+
     // Quick check that all parts of the message array were received.
-    if( count == 18 ){ valid = true; return true; }
+    if( count >= 18 ){ valid = true; return true; }
     else { valid = false; return false; }
 }
 
@@ -362,27 +790,96 @@ float wfObservationTempest::LightningStrikeAverageDistance(void){
 }
 
 
+
 /* *********************************************
 /  Status Hub Class
 /
 /  *********************************************/
+wfDeviceStatus::wfDeviceStatus(){
+    strSerialNumber.clear();
+    strHubSerialNumber.clear();
+    uiFirmwareVersion = 0;
+    ulTimeStamp = 0;
+    ulUptime = 0;
+    uiVoltage = 0;
+    iRssi = -999;
+    iHubRssi = -999;
+    uiSensorStatus = 0;
+    uiDebug = 0;
+    valid = false;
+}
+
+// Parse the JSON message for the device status data.
+bool wfDeviceStatus::ParseMsg(JsonDocument& jsonMsg){
+    strSerialNumber = jsonMsg["serial_number"].as<String>();
+    strHubSerialNumber = jsonMsg["hub_sn"].as<String>();
+    ulTimeStamp = jsonMsg["timestamp"].as<time_t>();
+    ulUptime = jsonMsg["uptime"].as<time_t>();
+    uiVoltage = jsonMsg["voltage"].as<unsigned int>();
+    uiFirmwareVersion = jsonMsg["firmware_revision"].as<unsigned int>();
+    iRssi = jsonMsg["rssi"].as<int>();
+    iHubRssi = jsonMsg["hub_rssi"].as<int>();
+    uiSensorStatus = jsonMsg["sensor_status"].as<unsigned int>();
+    uiDebug = jsonMsg["debug"].as<unsigned int>();
+    valid = true;
+    return valid;
+}
+
+
+
+/* *********************************************
+/  Status Hub Class
+/
+/  *********************************************/
+wfHubStatus::wfHubStatus(){
+    strHubSerialNumber.clear();
+    strFirmwareVersion.clear();
+    ulTimeStamp = 0;
+    ulUptime = 0;
+    iRssi = -999;
+    strResetFlags.clear();
+    uiSequence = 0;
+    valid = false;
+}
 
 // Parse the JSON message for the hub status data.
-bool wfStatusHub::ParseMsg(JsonDocument& jsonMsg){
-    // FIXME: implement this function...
-    return false;
+bool wfHubStatus::ParseMsg(JsonDocument& jsonMsg){
+    strHubSerialNumber = jsonMsg["serial_number"].as<String>();
+    strFirmwareVersion = jsonMsg["firmware_revision"].as<String>();
+    ulTimeStamp = jsonMsg["timestamp"].as<time_t>();
+    ulUptime = jsonMsg["uptime"].as<time_t>();
+    iRssi = jsonMsg["rssi"].as<int>();
+    strResetFlags = jsonMsg["reset_flags"].as<String>();
+    uiSequence = jsonMsg["seq"].as<unsigned int>();
+    valid = true;
+    return valid;
 }
+
+
 
 /* *********************************************
 /  Main WeatherFlow Class
 /
 /  *********************************************/
+WeatherFlow::WeatherFlow(){
+    units = Imperial;
+    this->init();
+}
+
+WeatherFlow::WeatherFlow(wfUnits u){
+    units = u;
+    this->init();
+}
+
 void WeatherFlow::init(void){
     myRainStartEvent = new wfRainStartEvent(this->units);
     myLightningStrikeEvent = new wfLightningStrikeEvent(this->units);
     myRapidWind = new wfRapidWind(this->units);
+    myObservationAir = new wfObservationAir(this->units);
+    myObservationSky = new wfObservationSky(this->units);
     myObservationTempest = new wfObservationTempest(this->units);
-    myStatusHub = new wfStatusHub(this->units);
+    myDeviceStatus = new wfDeviceStatus();
+    myHubStatus = new wfHubStatus();
     UDPrcvr = new WiFiUDP();
 }
 
@@ -392,8 +889,11 @@ WeatherFlow::~WeatherFlow(){
     delete myRainStartEvent;
     delete myLightningStrikeEvent;
     delete myRapidWind;
+    delete myObservationAir;
+    delete myObservationSky;
     delete myObservationTempest;
-    delete myStatusHub;
+    delete myDeviceStatus;
+    delete myHubStatus;
 }
 
 // Set up the UDP receiver, listening for the broadcast 
@@ -427,15 +927,40 @@ bool WeatherFlow::ReceiveLoop(void){
                 break;
                 case rapid_wind: return this->myRapidWind->ParseMsg(jsonMsg);
                 break;
+                case obs_air: return this->myObservationAir->ParseMsg(jsonMsg);
+                break;
+                case obs_sky: return this-myObservationSky->ParseMsg(jsonMsg);
+                break;
                 case obs_st: return this->myObservationTempest->ParseMsg(jsonMsg);                
                 break;
-                case hub_status: return this->myStatusHub->ParseMsg(jsonMsg);
+                case device_status: return this->myDeviceStatus->ParseMsg(jsonMsg);
                 break;
-                // FIXME: Deal with other message types
+                case hub_status: return this->myHubStatus->ParseMsg(jsonMsg);
+                break;
                 default: return false;
                 break;
             }
         }
     }
     return false;
+}
+
+// Change the current units of the WeatherFlow objects and sub-classes.
+// Note, this clears all currently received data from the sub-classes.
+void WeatherFlow::SetUnits(wfUnits u){
+    delete myRainStartEvent;
+    delete myLightningStrikeEvent;
+    delete myRapidWind;
+    delete myObservationAir;
+    delete myObservationSky;
+    delete myObservationTempest;
+
+    this->units = u;
+
+    myRainStartEvent = new wfRainStartEvent(this->units);
+    myLightningStrikeEvent = new wfLightningStrikeEvent(this->units);
+    myRapidWind = new wfRapidWind(this->units);
+    myObservationAir = new wfObservationAir(this->units);
+    myObservationSky = new wfObservationSky(this->units);
+    myObservationTempest = new wfObservationTempest(this->units);
 }
