@@ -61,10 +61,10 @@ class wfRainStartEvent{
         wfRainStartEvent();
         wfRainStartEvent(wfUnits);
         bool ParseMsg(JsonDocument&);
-        time_t EpochTime(void){ return ulTimeEpoch; };
-        bool Valid(void){ return valid; };
-        String SerialNumber(void){ return strSerialNumber; };
-        String HubSerialNumber(void){ return strHubSerialNumber; };
+        time_t EpochTime(void);
+        bool Valid(void);
+        String SerialNumber(void);
+        String HubSerialNumber(void);
 };
 
 class wfLightningStrikeEvent{
@@ -80,12 +80,12 @@ class wfLightningStrikeEvent{
         wfLightningStrikeEvent();
         wfLightningStrikeEvent(wfUnits);
         bool ParseMsg(JsonDocument&);
-        time_t EpochTime(void){ return ulTimeEpoch; }
-        unsigned int Energy(void){ return uiEnergy; }
-        bool Valid(void){ return valid; }
+        time_t EpochTime(void);
+        unsigned int Energy(void);
+        bool Valid(void);
         float Distance(void);
-        String SerialNumber(void){ return strSerialNumber; };
-        String HubSerialNumber(void){ return strHubSerialNumber; };
+        String SerialNumber(void);
+        String HubSerialNumber(void);
 };
 
 class wfRapidWind{
@@ -102,11 +102,11 @@ class wfRapidWind{
         wfRapidWind(wfUnits);
         bool ParseMsg(JsonDocument&);
         float WindSpeed(void);
-        unsigned int WindDirection(void){ return uiWindDirection; };
-        time_t EpochTime(void){ return ulTimeEpoch; };
-        bool Valid(void){ return valid; };
-        String SerialNumber(void){ return strSerialNumber; };
-        String HubSerialNumber(void){ return strHubSerialNumber; };
+        unsigned int WindDirection(void);
+        time_t EpochTime(void);
+        bool Valid(void);
+        String SerialNumber(void);
+        String HubSerialNumber(void);
 };
 
 class wfObservationAir{
@@ -129,18 +129,18 @@ class wfObservationAir{
         wfObservationAir();
         wfObservationAir(wfUnits u);
         bool ParseMsg(JsonDocument&);
-        bool Valid(void){ return valid; };
-        time_t EpochTime(void){ return ulTimeEpoch; };
+        bool Valid(void);
+        time_t EpochTime(void);
         float StationPressure(void);
         float AirTemperature(void);
-        float RelativeHumidity(void){ return fRelativeHumidity; };
-        unsigned int LightningStrikeCount(void){ return uiLightningStrikeCount; };
+        float RelativeHumidity(void);
+        unsigned int LightningStrikeCount(void);
         float LightningStrikeAvgDistance(void);
-        float BatteryVoltage(void){ return fBatteryVoltage; };
-        unsigned int ReportInterval(void){ return uiReportInterval; };
-        String SerialNumber(void){ return strSerialNumber; };
-        String HubSerialNumber(void){ return strHubSerialNumber; };
-        unsigned int FirmwareVersion(void){ return uiFirmwareVersion; };
+        float BatteryVoltage(void);
+        unsigned int ReportInterval(void);
+        String SerialNumber(void);
+        String HubSerialNumber(void);
+        unsigned int FirmwareVersion(void);
 };
 
 class wfObservationSky{
@@ -172,24 +172,24 @@ class wfObservationSky{
         wfObservationSky();
         wfObservationSky(wfUnits u);
         bool ParseMsg(JsonDocument&);
-        bool Valid(void){ return valid; };
-        time_t EpochTime(void){ return ulTimeEpoch; };
+        bool Valid(void);
+        time_t EpochTime(void);
         float Illuminance(void);
-        unsigned int UV(void){ return uiUv; };
+        unsigned int UV(void);
         float RainOverPreviousMinute(void);
         float WindLull(void);
         float WindAverage(void);
         float WindGust(void);
-        unsigned int WindDirection(void){ return uiWindDirection; };
-        float BatteryVoltage(void){ return fBatteryVoltage; };
-        unsigned int ReportInterval(void){ return uiReportInterval; };
+        unsigned int WindDirection(void);
+        float BatteryVoltage(void);
+        unsigned int ReportInterval(void);
         float SolarRadiation(void);
         float LocalDayRainAccumulation(void);
-        PartType ParticipationType(void){ return static_cast<PartType>(uiParticipationType); };
-        unsigned long WindSampleInterval(void){ return uiWindSampleInterval; };
-        String SerialNumber(void){ return strSerialNumber; };
-        String HubSerialNumber(void){ return strHubSerialNumber; };
-        unsigned int FirmwareVersion(void){ return uiFirmwareVersion; };
+        PartType ParticipationType(void);
+        unsigned long WindSampleInterval(void);
+        String SerialNumber(void);
+        String HubSerialNumber(void);
+        unsigned int FirmwareVersion(void);
 };
 
 class wfObservationTempest{
@@ -225,28 +225,28 @@ class wfObservationTempest{
         wfObservationTempest();
         wfObservationTempest(wfUnits u);
         bool ParseMsg(JsonDocument&);
-        bool Valid(void){ return valid; };
-        time_t EpochTime(void){ return ulTimeEpoch; };
+        bool Valid(void);
+        time_t EpochTime(void);
         float WindAverage(void);
         float WindLull(void);
         float WindGust(void);
-        unsigned int WindDirection(void){ return uiWindDirection; };
-        unsigned long WindSampleInterval(void){ return uiWindSampleInterval; };
+        unsigned int WindDirection(void);
+        unsigned long WindSampleInterval(void);
         float StationPressure(void);
         float AirTemperature(void);
-        float RelativeHumidity(void){ return fRelativeHumidity; };
+        float RelativeHumidity(void);
         float Illuminance(void);
-        unsigned int UV(void){ return uiUv; };
+        unsigned int UV(void);
         float SolarRadiation(void);
         float RainOverPreviousMinute(void);
-        PartType ParticipationType(void){ return static_cast<PartType>(uiParticipationType); };
+        PartType ParticipationType(void);
         float LightningStrikeAverageDistance(void);
-        unsigned int LightningStrikeCount(void){ return uiLightningStrikeCount; };
-        float BatteryVoltage(void){ return fBatteryVoltage; };
-        unsigned int ReportInterval(void){ return uiReportInterval; };
-        String SerialNumber(void){ return strSerialNumber; };
-        String HubSerialNumber(void){ return strHubSerialNumber; };
-        unsigned int FirmwareVersion(void){ return uiFirmwareVersion; };
+        unsigned int LightningStrikeCount(void);
+        float BatteryVoltage(void);
+        unsigned int ReportInterval(void);
+        String SerialNumber(void);
+        String HubSerialNumber(void);
+        unsigned int FirmwareVersion(void);
 };
 
 class wfDeviceStatus{
@@ -280,17 +280,17 @@ class wfDeviceStatus{
         };
         wfDeviceStatus();
         bool ParseMsg(JsonDocument&);
-        bool Valid(void){ return valid; }
-        String SerialNumber(void){ return strSerialNumber; };
-        String HubSerialNumber(void){ return strHubSerialNumber; };
-        unsigned int FirmwareVersion(void){ return uiFirmwareVersion; };
-        time_t TimeStamp(void){ return ulTimeStamp; };
-        time_t Uptime(void){ return ulUptime; };
-        unsigned int Voltage(void){ return uiVoltage; };
-        int RSSI(void){ return iRssi; };
-        int HubRSSI(void){ return iHubRssi; };
-        unsigned int SensorStatus(void){ return uiSensorStatus; };
-        DebugStatus Debug(void){ return static_cast<DebugStatus>(uiDebug); };
+        bool Valid(void);
+        String SerialNumber(void);
+        String HubSerialNumber(void);
+        unsigned int FirmwareVersion(void);
+        time_t TimeStamp(void);
+        time_t Uptime(void);
+        unsigned int Voltage(void);
+        int RSSI(void);
+        int HubRSSI(void);
+        unsigned int SensorStatus(void);
+        DebugStatus Debug(void);
 };
 
 class wfHubStatus{
@@ -306,14 +306,14 @@ class wfHubStatus{
     public:
         wfHubStatus();
         bool ParseMsg(JsonDocument&);
-        String HubSerialNumber(void){ return strHubSerialNumber; };
-        String FirmwareVersion(void){ return strFirmwareVersion; };
-        time_t TimeStamp(void){ return ulTimeStamp; };
-        time_t Uptime(void){ return ulUptime; };
-        String ResetFlags(void){ return strResetFlags; };
-        unsigned int Sequence(void){ return uiSequence; };
-        int RSSI(void){ return iRssi; };
-        bool Valid(void){ return valid; };
+        String HubSerialNumber(void);
+        String FirmwareVersion(void);
+        time_t TimeStamp(void);
+        time_t Uptime(void);
+        String ResetFlags(void);
+        unsigned int Sequence(void);
+        int RSSI(void);
+        bool Valid(void);
 };
 
 class WeatherFlow{
@@ -356,15 +356,15 @@ class WeatherFlow{
         bool Begin(void);
         bool ReceiveLoop(void);
         void SetUnits(wfUnits);
-        wfUnits GetUnits(void){ return units; };
-        wfRainStartEvent RainStartEvent(void){ return *myRainStartEvent; };
-        wfLightningStrikeEvent LightningStrikeEvent(void){ return *myLightningStrikeEvent; };
-        wfRapidWind RapidWind(void){ return *myRapidWind; }
-        wfObservationAir ObservationAir(void){ return *myObservationAir; };
-        wfObservationSky ObservationSky(void){ return *myObservationSky; };
-        wfObservationTempest ObservationTempest(void){ return *myObservationTempest; };
-        wfDeviceStatus DeviceStatus(void){ return *myDeviceStatus; };
-        wfHubStatus HubStatus(void){ return *myHubStatus; };
+        wfUnits GetUnits(void);
+        wfRainStartEvent RainStartEvent(void);
+        wfLightningStrikeEvent LightningStrikeEvent(void);
+        wfRapidWind RapidWind(void);
+        wfObservationAir ObservationAir(void);
+        wfObservationSky ObservationSky(void);
+        wfObservationTempest ObservationTempest(void);
+        wfDeviceStatus DeviceStatus(void);
+        wfHubStatus HubStatus(void);
 };    
 
 #endif

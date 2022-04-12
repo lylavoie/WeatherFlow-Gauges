@@ -60,6 +60,18 @@ wfRainStartEvent::wfRainStartEvent(wfUnits u){
     strHubSerialNumber.clear(); 
 }
 
+// Time of the rain start event, in Epoch seconds.
+time_t wfRainStartEvent::EpochTime(void){ return ulTimeEpoch; };
+
+// Event data is valid.
+bool wfRainStartEvent::Valid(void){ return valid; };
+        
+// Serial number of the reporting station, as a String.
+String wfRainStartEvent::SerialNumber(void){ return strSerialNumber; };
+        
+// Serial number of the receiving hub, as a String.
+String wfRainStartEvent::HubSerialNumber(void){ return strHubSerialNumber; };
+
 // Parse the JSON message for the event data.
 bool wfRainStartEvent::ParseMsg(JsonDocument& jsonMsg){
     // Check that we've good the right message components
@@ -87,6 +99,7 @@ bool wfRainStartEvent::ParseMsg(JsonDocument& jsonMsg){
     if( count >= 1 ){ valid = true; return true; }
     else { valid = false; return false; }
 }
+
 
 
 
@@ -162,6 +175,22 @@ float wfLightningStrikeEvent::Distance(void){
             break;
     }
 }
+
+// Time of the strike event, in Epoch seconds.
+time_t wfLightningStrikeEvent::EpochTime(void){ return ulTimeEpoch; }
+
+// Detected energy of the strike
+unsigned int wfLightningStrikeEvent::Energy(void){ return uiEnergy; }
+
+// Event data is valid.
+bool wfLightningStrikeEvent::Valid(void){ return valid; }
+
+// Serial number of the reporting station, as a String.
+String wfLightningStrikeEvent::SerialNumber(void){ return strSerialNumber; };
+        
+// Serial number of the receiving hub, as a String.
+String wfLightningStrikeEvent::HubSerialNumber(void){ return strHubSerialNumber; };
+
 
 
 
@@ -239,6 +268,22 @@ float wfRapidWind::WindSpeed(){
             break;
     }
 }
+
+// Wind direction in degrees
+unsigned int wfRapidWind::WindDirection(void){ return uiWindDirection; };
+
+// Time of the strike event, in Epoch seconds.
+time_t wfRapidWind::EpochTime(void){ return ulTimeEpoch; };
+
+// Event data is valid.
+bool wfRapidWind::Valid(void){ return valid; };
+
+// Serial number of the reporting station, as a String.
+String wfRapidWind::SerialNumber(void){ return strSerialNumber; };
+        
+// Serial number of the receiving hub, as a String.
+String wfRapidWind::HubSerialNumber(void){ return strHubSerialNumber; };
+
 
 
 
@@ -360,6 +405,34 @@ float wfObservationAir::LightningStrikeAvgDistance(void){
             break;
     }
 }
+
+// Observation data is valid.
+bool wfObservationAir::Valid(void){ return valid; };
+
+// Time of the observatin in Epoch seconds.
+time_t wfObservationAir::EpochTime(void){ return ulTimeEpoch; };
+
+// Relative humidity as a percentage.
+float wfObservationAir::RelativeHumidity(void){ return fRelativeHumidity; };
+
+// Lightening strike count as an unsigned integer
+unsigned int wfObservationAir::LightningStrikeCount(void){ return uiLightningStrikeCount; };
+
+// Station battery voltage as a float.
+float wfObservationAir::BatteryVoltage(void){ return fBatteryVoltage; };
+
+// Report interval of of the data in the observation in seconds as unsigned integer.
+unsigned int wfObservationAir::ReportInterval(void){ return uiReportInterval; };
+
+// Serial number of the reporting station, as a String.
+String wfObservationAir::SerialNumber(void){ return strSerialNumber; };
+        
+// Serial number of the receiving hub, as a String.
+String wfObservationAir::HubSerialNumber(void){ return strHubSerialNumber; };
+
+// Firmware version of the station as an unsigned integer
+unsigned int wfObservationAir::FirmwareVersion(void){ return uiFirmwareVersion; };
+
 
 
 
@@ -554,6 +627,40 @@ float wfObservationSky::LocalDayRainAccumulation(void){
             break;
     }
 }
+
+// Observation data is valid.
+bool wfObservationSky::Valid(void){ return valid; };
+
+// Time of the observatin in Epoch seconds.
+time_t wfObservationSky::EpochTime(void){ return ulTimeEpoch; };
+
+// Observed UV index as unsigned integer.
+unsigned int wfObservationSky::UV(void){ return uiUv; };
+
+// Observed wind direction in degrees as unsigned integer.
+unsigned int wfObservationSky::WindDirection(void){ return uiWindDirection; };
+
+// Station battery voltage as float.
+float wfObservationSky::BatteryVoltage(void){ return fBatteryVoltage; };
+
+// Report interval for this observation in seconds as unsigned integer.
+unsigned int wfObservationSky::ReportInterval(void){ return uiReportInterval; };
+
+// Observed participation type
+wfObservationSky::PartType wfObservationSky::ParticipationType(void){ return static_cast<PartType>(uiParticipationType); };
+
+// Wind sample interval in seconds as unsigned integer.
+unsigned long wfObservationSky::WindSampleInterval(void){ return uiWindSampleInterval; };
+
+// Reporting station serial number as string.
+String wfObservationSky::SerialNumber(void){ return strSerialNumber; };
+
+// Receiving hub serial number as string. 
+String wfObservationSky::HubSerialNumber(void){ return strHubSerialNumber; };
+
+// Station firmware version as unsigned integer.
+unsigned int wfObservationSky::FirmwareVersion(void){ return uiFirmwareVersion; };
+
 
 
 
@@ -789,10 +896,50 @@ float wfObservationTempest::LightningStrikeAverageDistance(void){
     }
 }
 
+// Observation data is valid
+bool wfObservationTempest::Valid(void){ return valid; };
+
+// Observation time as Epoch seconds
+time_t wfObservationTempest::EpochTime(void){ return ulTimeEpoch; };
+
+// Observed wind direction in degrees as unsigned integer.
+unsigned int wfObservationTempest::WindDirection(void){ return uiWindDirection; };
+
+// Wind sample interval in seconds as unsigned integer.
+unsigned long wfObservationTempest::WindSampleInterval(void){ return uiWindSampleInterval; };
+
+// Observed relative humidity percentage as float.
+float wfObservationTempest::RelativeHumidity(void){ return fRelativeHumidity; };
+
+// Observed UV index as unsigned integer.
+unsigned int wfObservationTempest::UV(void){ return uiUv; };
+
+// Observed participation type.
+wfObservationTempest::PartType wfObservationTempest::ParticipationType(void){ return static_cast<PartType>(uiParticipationType); };
+
+// Observed lightning strike count as unsigned integer.
+unsigned int wfObservationTempest::LightningStrikeCount(void){ return uiLightningStrikeCount; };
+
+// Station battery voltage as float.
+float wfObservationTempest::BatteryVoltage(void){ return fBatteryVoltage; };
+
+// Report interval in seconds as unsigned seconds. 
+unsigned int wfObservationTempest::ReportInterval(void){ return uiReportInterval; };
+
+// Reporting station serial number as String.
+String wfObservationTempest::SerialNumber(void){ return strSerialNumber; };
+
+// Receiving hub serial number as String.
+String wfObservationTempest::HubSerialNumber(void){ return strHubSerialNumber; };
+
+// Station firmware number as unsigned integer.
+unsigned int wfObservationTempest::FirmwareVersion(void){ return uiFirmwareVersion; };
+
+
 
 
 /* *********************************************
-/  Status Hub Class
+/  Status Device Class
 /
 /  *********************************************/
 wfDeviceStatus::wfDeviceStatus(){
@@ -825,6 +972,40 @@ bool wfDeviceStatus::ParseMsg(JsonDocument& jsonMsg){
     return valid;
 }
 
+// Status data is valid.
+bool wfDeviceStatus::Valid(void){ return valid; }
+
+// Reporting station serial number as String.
+String wfDeviceStatus::SerialNumber(void){ return strSerialNumber; };
+
+// Receiving hub serial number as String.
+String wfDeviceStatus::HubSerialNumber(void){ return strHubSerialNumber; };
+
+// Station firmware version as unsigned integer.
+unsigned int wfDeviceStatus::FirmwareVersion(void){ return uiFirmwareVersion; };
+
+// Status time stamp as Epoch seconds.
+time_t wfDeviceStatus::TimeStamp(void){ return ulTimeStamp; };
+
+// Station uptime in seconds.
+time_t wfDeviceStatus::Uptime(void){ return ulUptime; };
+
+// Station battery voltage as unsigned integer.
+unsigned int wfDeviceStatus::Voltage(void){ return uiVoltage; };
+
+// Station wireless RSSI as integer.
+int wfDeviceStatus::RSSI(void){ return iRssi; };
+
+// Hub wireless RSSI as integer.
+int wfDeviceStatus::HubRSSI(void){ return iHubRssi; };
+
+// Station sensor status
+unsigned int wfDeviceStatus::SensorStatus(void){ return uiSensorStatus; };
+
+// Station debug status
+wfDeviceStatus::DebugStatus wfDeviceStatus::Debug(void){ return static_cast<DebugStatus>(uiDebug); };
+
+
 
 
 /* *********************************************
@@ -854,6 +1035,30 @@ bool wfHubStatus::ParseMsg(JsonDocument& jsonMsg){
     valid = true;
     return valid;
 }
+
+// Hub serial number as String.
+String wfHubStatus::HubSerialNumber(void){ return strHubSerialNumber; };
+
+// Hub firmware version as String.
+String wfHubStatus::FirmwareVersion(void){ return strFirmwareVersion; };
+
+// Status time stamp in Epoch seconds.
+time_t wfHubStatus::TimeStamp(void){ return ulTimeStamp; };
+
+// Hub uptime in seconds.
+time_t wfHubStatus::Uptime(void){ return ulUptime; };
+
+// Hub last reset cause, comma separated string.
+String wfHubStatus::ResetFlags(void){ return strResetFlags; };
+
+// Sequence number as unsigned integer.
+unsigned int wfHubStatus::Sequence(void){ return uiSequence; };
+
+// Hub wireless RSSI as integer.
+int wfHubStatus::RSSI(void){ return iRssi; };
+
+// Hub status data is valud.
+bool wfHubStatus::Valid(void){ return valid; };
 
 
 
@@ -964,3 +1169,30 @@ void WeatherFlow::SetUnits(wfUnits u){
     myObservationSky = new wfObservationSky(this->units);
     myObservationTempest = new wfObservationTempest(this->units);
 }
+
+// Current units of the WeatherFlow object data.
+wfUnits WeatherFlow::GetUnits(void){ return units; };
+
+// Latest rain start event data.
+wfRainStartEvent WeatherFlow::RainStartEvent(void){ return *myRainStartEvent; };
+
+// Latest lightning strike event data.
+wfLightningStrikeEvent WeatherFlow::LightningStrikeEvent(void){ return *myLightningStrikeEvent; };
+
+// Latest rapid wind data.
+wfRapidWind WeatherFlow::RapidWind(void){ return *myRapidWind; }
+
+// Latest AIR station observation data.
+wfObservationAir WeatherFlow::ObservationAir(void){ return *myObservationAir; };
+
+// Latest SKY station observation data.
+wfObservationSky WeatherFlow::ObservationSky(void){ return *myObservationSky; };
+
+// Latest Tempest station observation data.
+wfObservationTempest WeatherFlow::ObservationTempest(void){ return *myObservationTempest; };
+
+// Latest device status data.
+wfDeviceStatus WeatherFlow::DeviceStatus(void){ return *myDeviceStatus; };
+
+// Latest hub status data.
+wfHubStatus WeatherFlow::HubStatus(void){ return *myHubStatus; };
