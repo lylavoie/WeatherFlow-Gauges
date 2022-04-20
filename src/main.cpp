@@ -75,6 +75,7 @@ void ExtractConfig(FullConfig &newConfig, DynamicJsonDocument SettingsDoc);
 void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 255);
 uint32_t scalePwmOutput(float dataVal, float minScale, float maxScale, float gain = 1);
 uint8_t encodeWind(int windDir);
+void RunCalibration(void);
 
 
 // WiFi Parameters
@@ -92,7 +93,7 @@ void handleWebSocketMessage(AwsFrameInfo *info, uint8_t *data, size_t len);
 String webTemplateProcessor(const String& var);
 void webServerSpiffsHandler(AsyncWebServerRequest *request);
 
-enum CalMode { none, fixed, range };
+enum CalMode { none, range };
 CalMode CalibrationMode = none;
 
 
@@ -156,7 +157,7 @@ void setup() {
   // ==================================================
   // Wi-Fi Startup
   // ==================================================
-  if( !SystemConfig.ssid || !SystemConfig.wifipass ){
+  if( !SystemConfig.ssid[0] || !SystemConfig.wifipass[0] ){
     // ------------------------------------
     // Soft AP mode
     // ------------------------------------
@@ -309,6 +310,7 @@ void loop() {
   static bool bOneShot = false;
   static bool bGaugeLamp = false;
 
+
   // Get the current time
   time(&ul32CurTime);
 
@@ -318,34 +320,11 @@ void loop() {
   // ==============================================================
   // Calibration modes
   // ==============================================================
-  /*
   if( CalibrationMode == range ){
-    debug(1, "\n\rWind is %f Mph at %i degrees.", fWindSpeedMph, iWindDirectionDegrees);
-    u32WindPwm = scalePwmOutput(fWindSpeedMph, SystemConfig.WindConfig.min, SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
-    debug(1, "\n\rWind PWM: %i", u32WindPwm);
-    ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
-
-    fWindSpeedMph += SystemConfig.WindConfig.step;
-    if( fWindSpeedMph > SystemConfig.WindConfig.max )fWindSpeedMph = SystemConfig.WindConfig.min;
-
-    debug(1, "\n\rAir temp is %f degrees F.", fAirTempF);\
-    u32TempPwm = scalePwmOutput(fAirTempF, SystemConfig.TempConfig.min, SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
-    debug(1, "\n\rTemp PWM: %i", u32TempPwm);
-    ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
-    
-    fAirTempF += SystemConfig.TempConfig.step;
-    if( fAirTempF > SystemConfig.TempConfig.max )fAirTempF = SystemConfig.TempConfig.min;
-
-    iWindDirectionDegrees+= 15;
-    if( iWindDirectionDegrees > 360 )iWindDirectionDegrees = 0;
-    u8WindDir = encodeWind(iWindDirectionDegrees);
-    debug(1, "\n\rWind direction code: 0x%02X", u8WindDir);
-    mcp.writeGPIO(u8WindDir, 0);
-
+    RunCalibration();
     delay(3000);
     return;
   }
-  */
   
   if( bSoftApActive ){
     // ================================================================
@@ -445,7 +424,7 @@ void loop() {
 
 }
 
-// ##################################################################dd
+// ##################################################################
 // # Debug printer
 // #
 // # Debug logging to the serial port, message is only printed if 
@@ -463,6 +442,42 @@ void debug(int level, const char *fmt, ...){
     Serial.print(chBuffer);
   }
   #endif
+}
+
+// ####################################################################
+// # Run Calibration
+// #
+// # Runs a simple calibration, steping through the gauge "steps",
+// # on each call (i.e. once per loop).  This allows the gain values
+// # to easily be "tuned."
+// ####################################################################
+void RunCalibration(void){
+  static float fWindSpeed = 0;
+  static float fAirTemp = 0;
+  static int iWindDirectionDegrees = 0;
+  uint32_t u32WindPwm;
+  uint32_t u32TempPwm;
+  uint8_t u8WindDir;
+
+  u32WindPwm = scalePwmOutput(fWindSpeed, SystemConfig.WindConfig.min, SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
+  debug(1, "\n\rWind PWM: %i", u32WindPwm);
+  ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
+
+  fWindSpeed += SystemConfig.WindConfig.step;
+  if( fWindSpeed > SystemConfig.WindConfig.max )fWindSpeed = SystemConfig.WindConfig.min;
+
+  u32TempPwm = scalePwmOutput(fAirTemp, SystemConfig.TempConfig.min, SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
+  debug(1, "\n\rTemp PWM: %i", u32TempPwm);
+  ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
+  
+  fAirTemp += SystemConfig.TempConfig.step;
+  if( fAirTemp > SystemConfig.TempConfig.max )fAirTemp = SystemConfig.TempConfig.min;
+
+  iWindDirectionDegrees+= 15;
+  if( iWindDirectionDegrees > 360 )iWindDirectionDegrees = 0;
+  u8WindDir = encodeWind(iWindDirectionDegrees);
+  debug(1, "\n\rWind direction code: 0x%02X", u8WindDir);
+  mcp.writeGPIO(u8WindDir, 0);
 }
 
 // ##################################################################
@@ -621,11 +636,6 @@ void handleWebSocketMessage(AwsFrameInfo *info, uint8_t *data, size_t len){
             deserializeJson(jsonSettings, objEepromStream);
             jsonSettings["wind"] = jsonWsMsg["payload"]["wind"];
             jsonSettings["temp"] = jsonWsMsg["payload"]["temp"];
-            if( strcmp("fixed", jsonWsMsg["payload"]["cal"]["mode"]) == 0 ){
-              CalibrationMode = fixed;
-              //fAirTempF = jsonWsMsg["payload"]["cal"]["cal_fixed_temp"];
-              //fWindSpeedMph = jsonWsMsg["payload"]["cal"]["cal_fixed_wind"];
-            }
             if( strcmp("range", jsonWsMsg["payload"]["cal"]["mode"]) == 0 ){
               CalibrationMode = range;
             }
