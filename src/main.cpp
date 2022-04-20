@@ -438,14 +438,6 @@ void loop() {
     }
   }
 
-  // ================================================================
-  // Wi-Fi in AP mode, listening for WeatherFlow messages
-  // ================================================================
-  if( bSoftApActive ){
-    // Cycle the DotStar color, just to give the user some feedback
-    TP.DotStar_CycleColor(25);
-  }
-
   // ==================================================
   // Watchdog timer reset
   // ==================================================
