@@ -1,18 +1,16 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
-#include <WiFiUdp.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>
-#include <ArduinoOTA.h>
-#include <StreamUtils.h>
 #include <TinyPICO.h>
 #include <Adafruit_MCP23X08.h>
 #include <SPIFFS.h>
-#include <Update.h>
 #include <esp_task_wdt.h>
 #include "wf.h"
+#include "PersistSettings.h"
+#include "Config.h"
 #include <map>
 #include <ctime>
 
@@ -22,7 +20,7 @@ int	_EXFUN(setenv,(const char *__string, const char *__value, int __overwrite));
 
 // Version info
 #define MAJOR 1
-#define MINOR 1
+#define MINOR 2
 #define PATCH 0
 
 // Debug Info
@@ -47,31 +45,13 @@ TinyPICO TP = TinyPICO();
 // WeatherFlow Handler
 WeatherFlow WF(Imperial);
 
+// Persistent Settings Handler
+PersistSettings<AppConfig> Settings(AppConfig::Version);
+
 // Hardware I2C GPIO extender
 Adafruit_MCP23X08 mcp;
 
-struct GaugeConfig{
-  float min;
-  float max;
-  float step;
-  float gain;
-  float threshold;
-};
-
-struct FullConfig{
-  GaugeConfig WindConfig;
-  GaugeConfig TempConfig;
-  char ssid[32];
-  char wifipass[32];
-  char username[32];
-  char userpass[32];
-};
-
-FullConfig SystemConfig;
-
 // Function Prototypes
-void setDefaultSettings(void);
-void ExtractConfig(FullConfig &newConfig, DynamicJsonDocument SettingsDoc);
 void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 255);
 uint32_t scalePwmOutput(float dataVal, float minScale, float maxScale, float gain = 1);
 uint8_t encodeWind(int windDir);
@@ -79,8 +59,6 @@ void RunCalibration(void);
 
 
 // WiFi Parameters
-#define SETTINGS_SIZE 512
-EepromStream objEepromStream(0, SETTINGS_SIZE);
 bool bSoftApActive = false;
 #define AP_MODE_SSID "WeatherFlowGauges"
 
@@ -106,7 +84,6 @@ void setup() {
   // ==================================================
   // Hardware Init Stuff
   // ==================================================
-  EEPROM.begin(SETTINGS_SIZE);
   SPIFFS.begin();
 
   // ==================================================
@@ -123,12 +100,10 @@ void setup() {
   // ==================================================
   // Settings (non-volitale)
   // ==================================================
-  DynamicJsonDocument jsonSettings(SETTINGS_SIZE);
-  deserializeJson(jsonSettings, objEepromStream);
-  ExtractConfig(SystemConfig, jsonSettings);
+  Settings.Begin();
 
   // ==================================================
-  // Button Setup & Reset Request
+  // Button Setup & Reset Default Settings
   // ==================================================
   pinMode(BTNPIN1, INPUT_PULLUP);
   int iSwitchDebounce = 0;
@@ -140,7 +115,7 @@ void setup() {
     // Stage 1 reset
     if( iSwitchDebounce++ > 10 ){
       TP.DotStar_SetPixelColor(0xFF0000);
-      setDefaultSettings();
+      Settings.ResetToDefault();
       delay(5000);
       ESP.restart();
     }
@@ -150,14 +125,13 @@ void setup() {
   // ==================================================
   // Environment Startup
   // ==================================================
-  // FIXME: Include the time-zone config in ConfigSettings
-  setenv("TZ", "EST+5EDT,M3.2.0/2,M11.1.0/2", true);
+  setenv("TZ", Settings.Config.TimeZone, true);
   tzset();
 
   // ==================================================
   // Wi-Fi Startup
   // ==================================================
-  if( !SystemConfig.ssid[0] || !SystemConfig.wifipass[0] ){
+  if( !Settings.Config.WiFi.ssid[0] || !Settings.Config.WiFi.pass[0] ){
     // ------------------------------------
     // Soft AP mode
     // ------------------------------------
@@ -177,8 +151,8 @@ void setup() {
     // ------------------------------------
     // STA mode
     // ------------------------------------
-    debug(1, "\n\rConecting to Wi-Fi: %s ...", SystemConfig.ssid);
-    WiFi.begin(SystemConfig.ssid, SystemConfig.wifipass);
+    debug(1, "\n\rConecting to Wi-Fi: %s ...", Settings.Config.WiFi.ssid);
+    WiFi.begin(Settings.Config.WiFi.ssid, Settings.Config.WiFi.pass);
     int iWiFiFailCount = 0;
     TP.DotStar_SetPixelColor(0x0000FF);
     while(WiFi.status() != WL_CONNECTED)
@@ -214,7 +188,7 @@ void setup() {
   objWebServer.on("/logout", HTTP_GET, [](AsyncWebServerRequest *request){request->send(401);});
   objWebServer.on("/logged-out.html", HTTP_GET, webServerSpiffsHandler);
   objWebServer.onNotFound([](AsyncWebServerRequest *request){
-    if( !request->authenticate(SystemConfig.username, SystemConfig.userpass) )
+    if( !request->authenticate(Settings.Config.Web.user, Settings.Config.Web.pass) )
       return request->requestAuthentication();
     webServerSpiffsHandler(request);
   });
@@ -222,41 +196,6 @@ void setup() {
   objWebServer.addHandler(&objWebSocket);
   objWebServer.begin();
 
-  // ==================================================
-  // OTA Firmware handling
-  // ==================================================
-
-  // Setup OTA firmware handling debug
-  #ifdef DEBUG
-  // Debug OTA start notice
-  ArduinoOTA.onStart([]() { Serial.println("OTA Starting"); });
-
-  // Debug OTA end notice
-  ArduinoOTA.onEnd([]() { Serial.println("OTA Finished"); });
-
-  // Debug OTA progress
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) {
-      Serial.println("Auth Failed");
-    } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("Begin Failed");
-    } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Connect Failed");
-    } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Receive Failed");
-    } else if (error == OTA_END_ERROR) {
-      Serial.println("End Failed");
-    }
-  });
-  #endif
-  // Start the OTA process
-  //ArduinoOTA.
-  ArduinoOTA.begin();
 
   // ==================================================
   // PWM controls for gauge outputs
@@ -311,18 +250,20 @@ void loop() {
   static bool bGaugeLamp = false;
 
 
-  // Get the current time
+  // ================================================================
+  // Watchdog timer reset & current time
+  // ================================================================   
   time(&ul32CurTime);
+  esp_task_wdt_reset();
 
-  // Check for any incoming OTA updates
-  ArduinoOTA.handle();
 
-  // ==============================================================
+  // ================================================================
   // Calibration modes
-  // ==============================================================
-  if( CalibrationMode == range ){
+  // ================================================================
+  if( CalibrationMode == range){
+    debug(1, "\n\rRunning in calibration mode, current epoch time: %d", ul32CurTime);
     RunCalibration();
-    delay(3000);
+    delay(5000);
     return;
   }
   
@@ -354,8 +295,10 @@ void loop() {
       TP.DotStar_SetPixelColor(0x0);
     }
 
-    // WeatherFlow receiver loop function call, return indicates new data
-    // is available
+    // ================================================================
+    // WeatherFlow receiver loop function call, return indicates
+    // new data is available
+    // ================================================================
     if( WF.ReceiveLoop() ){
       debug(1, "\n\rReceived updated weather info...");
       
@@ -365,12 +308,12 @@ void loop() {
         debug(1, "\n\r\tWind Speed: %f", WF.RapidWind().WindSpeed());
         debug(1, "\n\r\tWind Direction: %d", WF.RapidWind().WindDirection());
 
-        u32WindPwm = scalePwmOutput(WF.RapidWind().WindSpeed(), SystemConfig.WindConfig.min,
-          SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
+        u32WindPwm = scalePwmOutput(WF.RapidWind().WindSpeed(), Settings.Config.Wind.min,
+          Settings.Config.Wind.max, Settings.Config.Wind.gain);
         debug(2, "\n\r\tWind PWM: %i", u32WindPwm);
         ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
 
-        if( WF.RapidWind().WindSpeed() >= SystemConfig.WindConfig.threshold ){ 
+        if( WF.RapidWind().WindSpeed() >= Settings.Config.Wind.threshold ){ 
           u8WindDir = encodeWind(WF.RapidWind().WindDirection()); 
         }
         else{ 
@@ -395,32 +338,29 @@ void loop() {
       if( WF.ObservationTempest().Valid() ){
         debug(1, "\n\rValid Station Observation data:");
         debug(1, "\n\r\tAir Temperature: %f", WF.ObservationTempest().AirTemperature());
-        u32TempPwm = scalePwmOutput(WF.ObservationTempest().AirTemperature(), SystemConfig.TempConfig.min,
-          SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
+        u32TempPwm = scalePwmOutput(WF.ObservationTempest().AirTemperature(), Settings.Config.Temp.min,
+          Settings.Config.Temp.max, Settings.Config.Temp.gain);
         debug(2, "\n\r\tTemp PWM: %i", u32TempPwm);
         ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
       }
     }
   
+    // ================================================================
     // Check our current time, turn on the gauge lamps if needed
+    // ================================================================
     tm *tmCurrentTime;
     tmCurrentTime = localtime(&ul32CurTime);
-    // FIXME: Add on / off settings to ConfigSettings
-    if( !bGaugeLamp && tmCurrentTime->tm_hour == 19 && tmCurrentTime->tm_min == 0 ){
+    if( !bGaugeLamp && tmCurrentTime->tm_hour == Settings.Config.GaugeLamps.OnHour 
+        && tmCurrentTime->tm_min == Settings.Config.GaugeLamps.OnMinute ){
       bGaugeLamp = true;
-      // FIXME: Add Gauge Lamp brightness to ConfigSettings
-      ledcAnalogWrite(LED1CHANNEL, scalePwmOutput(100, 0, 100, 1));
+      ledcAnalogWrite(LED1CHANNEL, scalePwmOutput(Settings.Config.GaugeLamps.LampBrightness, 0, 100, 1));
     }
-    if( bGaugeLamp && tmCurrentTime->tm_hour == 7 && tmCurrentTime->tm_min == 0 ){
+    if( bGaugeLamp && tmCurrentTime->tm_hour == Settings.Config.GaugeLamps.OffHour && 
+        tmCurrentTime->tm_min == Settings.Config.GaugeLamps.OffMinute ){
       bGaugeLamp = false;
       ledcAnalogWrite(LED1CHANNEL, 0);
     }
   }
-
-  // ==================================================
-  // Watchdog timer reset
-  // ==================================================
-  if( ul32CurTime%5 == 0 )esp_task_wdt_reset();
 
 }
 
@@ -459,19 +399,21 @@ void RunCalibration(void){
   uint32_t u32TempPwm;
   uint8_t u8WindDir;
 
-  u32WindPwm = scalePwmOutput(fWindSpeed, SystemConfig.WindConfig.min, SystemConfig.WindConfig.max, SystemConfig.WindConfig.gain);
+  u32WindPwm = scalePwmOutput(fWindSpeed, Settings.Config.Wind.min, 
+    Settings.Config.Wind.max, Settings.Config.Wind.gain);
   debug(1, "\n\rWind PWM: %i", u32WindPwm);
   ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
 
-  fWindSpeed += SystemConfig.WindConfig.step;
-  if( fWindSpeed > SystemConfig.WindConfig.max )fWindSpeed = SystemConfig.WindConfig.min;
+  fWindSpeed += Settings.Config.Wind.step;
+  if( fWindSpeed > Settings.Config.Wind.max )fWindSpeed = Settings.Config.Wind.min;
 
-  u32TempPwm = scalePwmOutput(fAirTemp, SystemConfig.TempConfig.min, SystemConfig.TempConfig.max, SystemConfig.TempConfig.gain);
+  u32TempPwm = scalePwmOutput(fAirTemp, Settings.Config.Temp.min, 
+    Settings.Config.Temp.max, Settings.Config.Temp.gain);
   debug(1, "\n\rTemp PWM: %i", u32TempPwm);
   ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
   
-  fAirTemp += SystemConfig.TempConfig.step;
-  if( fAirTemp > SystemConfig.TempConfig.max )fAirTemp = SystemConfig.TempConfig.min;
+  fAirTemp += Settings.Config.Temp.step;
+  if( fAirTemp > Settings.Config.Temp.max )fAirTemp = Settings.Config.Temp.min;
 
   iWindDirectionDegrees+= 15;
   if( iWindDirectionDegrees > 360 )iWindDirectionDegrees = 0;
@@ -480,51 +422,6 @@ void RunCalibration(void){
   mcp.writeGPIO(u8WindDir, 0);
 }
 
-// ##################################################################
-// # Configuration Handlers
-// ##################################################################
-
-// # Default Settings
-void setDefaultSettings(void){
-  DynamicJsonDocument jsonDefaultSettings(SETTINGS_SIZE);
-  debug(1, "Resaving default values to EEPROM...");
-  jsonDefaultSettings.clear();
-  jsonDefaultSettings["wind"]["min"] = 0;
-  jsonDefaultSettings["wind"]["max"] = 40;
-  jsonDefaultSettings["wind"]["step"] = 10;
-  jsonDefaultSettings["wind"]["gain"] = 0.93;
-  jsonDefaultSettings["wind"]["threshold"] = 1;
-  jsonDefaultSettings["temp"]["min"] = -10;
-  jsonDefaultSettings["temp"]["max"] = 110;
-  jsonDefaultSettings["temp"]["step"] = 15;
-  jsonDefaultSettings["temp"]["gain"] = 0.88;
-  jsonDefaultSettings["auth"]["user"] = "admin";
-  jsonDefaultSettings["auth"]["pass"] = "temp";
-  serializeJson(jsonDefaultSettings, objEepromStream);
-  objEepromStream.flush();
-}
-
-// Load the configuration structure
-void ExtractConfig(FullConfig &newConfig, DynamicJsonDocument SettingsDoc){
-  // Wind
-  newConfig.WindConfig.min =  SettingsDoc["wind"]["min"];
-  newConfig.WindConfig.max = SettingsDoc["wind"]["max"];
-  newConfig.WindConfig.step = SettingsDoc["wind"]["step"];
-  newConfig.WindConfig.gain = SettingsDoc["wind"]["gain"];
-  newConfig.WindConfig.threshold = SettingsDoc["wind"]["threshold"];
-  // Temp
-  newConfig.TempConfig.min = SettingsDoc["temp"]["min"];
-  newConfig.TempConfig.max = SettingsDoc["temp"]["max"];
-  newConfig.TempConfig.step = SettingsDoc["temp"]["step"];
-  newConfig.TempConfig.gain = SettingsDoc["temp"]["gain"];
-  newConfig.TempConfig.threshold = 0;
-  // User Login
-  strlcpy(newConfig.username, SettingsDoc["auth"]["user"] | "admin", sizeof(newConfig.username));
-  strlcpy(newConfig.userpass, SettingsDoc["auth"]["pass"] | "temp", sizeof(newConfig.userpass));
-  // WiFi
-  strlcpy(newConfig.ssid, SettingsDoc["wifi"]["ssid"] | "", sizeof(newConfig.ssid));
-  strlcpy(newConfig.wifipass, SettingsDoc["wifi"]["pw"] | "", sizeof(newConfig.wifipass));
-}
 
 // ##################################################################
 // # PWM and Wind LED outputs
@@ -632,30 +529,34 @@ void handleWebSocketMessage(AwsFrameInfo *info, uint8_t *data, size_t len){
       switch( mapWsMsgTypes.find(std::string(chMsgtype))->second ){
         // Update System Settings
         case 1:{
-            DynamicJsonDocument jsonSettings(SETTINGS_SIZE);
-            deserializeJson(jsonSettings, objEepromStream);
-            jsonSettings["wind"] = jsonWsMsg["payload"]["wind"];
-            jsonSettings["temp"] = jsonWsMsg["payload"]["temp"];
+            
+            Settings.Config.Wind.min = jsonWsMsg["payload"]["wind"]["min"];
+            Settings.Config.Wind.max = jsonWsMsg["payload"]["wind"]["max"];
+            Settings.Config.Wind.step = jsonWsMsg["payload"]["wind"]["step"];
+            Settings.Config.Wind.gain = jsonWsMsg["payload"]["wind"]["gain"];
+            Settings.Config.Wind.threshold = jsonWsMsg["payload"]["wind"]["threshold"];
+
+            Settings.Config.Temp.min = jsonWsMsg["payload"]["temp"]["min"];
+            Settings.Config.Temp.max = jsonWsMsg["payload"]["temp"]["max"];
+            Settings.Config.Temp.step = jsonWsMsg["payload"]["temp"]["step"];
+            Settings.Config.Temp.gain = jsonWsMsg["payload"]["temp"]["gain"];
+
             if( strcmp("range", jsonWsMsg["payload"]["cal"]["mode"]) == 0 ){
               CalibrationMode = range;
             }
             if( strcmp("none", jsonWsMsg["payload"]["cal"]["mode"]) == 0 ){
               CalibrationMode = none;
             }
-            serializeJson(jsonSettings, objEepromStream);
-            objEepromStream.flush();
-            ExtractConfig(SystemConfig, jsonSettings);
           }
           break;
 
         // updateWiFi
         case 2:{
-            DynamicJsonDocument jsonSettings(SETTINGS_SIZE);
-            deserializeJson(jsonSettings, objEepromStream);
-            jsonSettings["wifi"] = jsonWsMsg["payload"]["wifi"];
-            debug(1, "\n\rGot Wi-Fi parameters, SSID: %s, and password: %s", jsonSettings["wifi"]["ssid"], jsonSettings["wifi"]["pw"]);
-            serializeJson(jsonSettings, objEepromStream);
-            objEepromStream.flush();
+            strcpy(Settings.Config.WiFi.ssid, jsonWsMsg["payload"]["wifi"]["ssid"]);
+            strcpy(Settings.Config.WiFi.pass, jsonWsMsg["payload"]["wifi"]["pw"]);
+            Settings.Write();
+            debug(1, "\n\rGot Wi-Fi parameters, SSID: %s, and password: %s", 
+              Settings.Config.WiFi.ssid, Settings.Config.WiFi.pass);
             delay(2000);
             ESP.restart();
           }
@@ -663,13 +564,11 @@ void handleWebSocketMessage(AwsFrameInfo *info, uint8_t *data, size_t len){
 
         //updateUser
         case 3:{
-            DynamicJsonDocument jsonSettings(SETTINGS_SIZE);
-            deserializeJson(jsonSettings, objEepromStream);
-            jsonSettings["auth"] = jsonWsMsg["payload"]["auth"];
-            debug(1, "\n\rGot Auth parameters, user: %s, and password: %s", jsonSettings["auth"]["user"], jsonSettings["auth"]["pass"]);
-            serializeJson(jsonSettings, objEepromStream);
-            objEepromStream.flush();
-            ExtractConfig(SystemConfig, jsonSettings);
+            strcpy(Settings.Config.Web.user, jsonWsMsg["payload"]["auth"]["user"]);
+            strcpy(Settings.Config.Web.pass, jsonWsMsg["payload"]["auth"]["pass"]);
+            Settings.Write();
+            debug(1, "\n\rGot Auth parameters, user: %s, and password: %s", 
+              Settings.Config.Web.user, Settings.Config.Web.pass);
           }
           break;
 
@@ -689,20 +588,20 @@ String webTemplateProcessor(const String& var){
   }
   else if( var == "WIFI_SSID" ){
     if( bSoftApActive){ return AP_MODE_SSID; }
-    else{ return String(SystemConfig.ssid); }
+    else{ return String(Settings.Config.WiFi.ssid); }
   }
   else if( var == "WIFI_IP_ADDR")return WiFi.localIP().toString();
   else if( var == "WIFI_RSSI" )return String(WiFi.RSSI());
   else if( var == "BAT_VOLT" )return String(TP.GetBatteryVoltage());
-  else if( var == "MIN_WIND" )return String(SystemConfig.WindConfig.min);
-  else if( var == "MAX_WIND" )return String(SystemConfig.WindConfig.max);
-  else if( var == "STEP_WIND" )return String(SystemConfig.WindConfig.step);
-  else if( var == "GAIN_WIND" )return String(SystemConfig.WindConfig.gain);
-  else if( var == "THRESHOLD_WIND" )return String(SystemConfig.WindConfig.threshold);
-  else if( var == "MIN_TEMP" )return String(SystemConfig.TempConfig.min);
-  else if( var == "MAX_TEMP" )return String(SystemConfig.TempConfig.max);
-  else if( var == "STEP_TEMP" )return String(SystemConfig.TempConfig.step);
-  else if( var == "GAIN_TEMP" )return String(SystemConfig.TempConfig.gain);
+  else if( var == "MIN_WIND" )return String(Settings.Config.Wind.min);
+  else if( var == "MAX_WIND" )return String(Settings.Config.Wind.max);
+  else if( var == "STEP_WIND" )return String(Settings.Config.Wind.step);
+  else if( var == "GAIN_WIND" )return String(Settings.Config.Wind.gain);
+  else if( var == "THRESHOLD_WIND" )return String(Settings.Config.Wind.threshold);
+  else if( var == "MIN_TEMP" )return String(Settings.Config.Temp.min);
+  else if( var == "MAX_TEMP" )return String(Settings.Config.Temp.max);
+  else if( var == "STEP_TEMP" )return String(Settings.Config.Temp.step);
+  else if( var == "GAIN_TEMP" )return String(Settings.Config.Temp.gain);
   else return "N/A";
 }
 

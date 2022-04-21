@@ -30,12 +30,22 @@ struct WebSettings{
     };
 };
 
+struct GaugeLampSettings{
+    int LampBrightness = 100;
+    int OnHour = 19;
+    int OnMinute = 0;
+    int OffHour = 7;
+    int OffMinute = 0;
+};
+
 struct AppConfig{
     static const unsigned int Version = 1;
     WiFiSettings WiFi;
     GaugeSettings Wind = {10, 50, 10, 0.93, 1};
     GaugeSettings Temp = {-10, 150, 15, 0.88, 1};
     WebSettings Web = {"admin", "temp"};
+    char TimeZone[32] = "EST+5EDT,M3.2.0/2,M11.1.0/2";
+    GaugeLampSettings GaugeLamps;
 };
 
 #endif
