@@ -1,0 +1,3 @@
+[submodule "lib/WeatherFlowLocalUdp"]
+	path = lib/WeatherFlowLocalUdp
+	url = git@github.com:lylavoie/WeatherFlowLocalUdp.git
