@@ -55,8 +55,6 @@ function submitSystemSettings(){
         },
         cal: {
             mode: fetchValue("cal_mode"),
-            wind: Number(fetchValue("cal_fixed_wind")),
-            temp: Number(fetchValue("cal_fixed_temp"))
         }
         
     };
@@ -123,16 +121,4 @@ function logout(){
     wxGaugesWS.close(1000, "logging out");
     xhr.send();
     setTimeout(function(){ window.open("/logged-out.html","_self"); }, 500);
-}
-
-// Show or hide the Fixed Calibration Value input fields
-function addFixedCalValueField(event){
-    console.log('Updating CalMode fields...');
-    if(event.currentTarget.id == "cal_mode" &&
-            event.currentTarget.value == "fixed"){
-        document.getElementById("cal_fixed_block").style.display = "inline";
-    }
-    else{
-        document.getElementById("cal_fixed_block").style.display = "none";
-    }
 }

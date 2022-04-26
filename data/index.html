@@ -162,21 +162,10 @@
                 <div>
                     <div>
                         <label for="cal_mode">Temperature Calibrate Mode</label>
-                        <select id="cal_mode" name="cal_mode" onchange="addFixedCalValueField(event);">
+                        <select id="cal_mode" name="cal_mode">
                             <option value="range">Test Scale</option>
-                            <option value="fixed">Fixed Value</option>
                             <option value="none" selected>None</option>
                         </select>
-                    </div>
-                    <div id="cal_fixed_block" style="display: none;">
-                        <div>
-                            <label for="cal_fixed_wind">Wind Fixed Calibration Value</label>
-                            <input type="text" id="cal_fixed_wind" name="cal_fixed_wind" placeholder="10" value="10" required pattern="\d+\.?\d*"/>
-                        </div>
-                        <div>
-                            <label for="cal_fixed_temp">Temperature Fixed Calibration Value</label>
-                            <input type="text" id="cal_fixed_temp" name="cal_fixed_temp" placeholder="32" value="32" required pattern="\d+\.?\d*"/>
-                        </div>
                     </div>
                 </div>
 
