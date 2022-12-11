@@ -13,6 +13,7 @@
 #include "Config.h"
 #include <map>
 #include <ctime>
+#include <math.h>
 
 // Note, these are required because of https://community.platformio.org/t/identifier-is-undefined-setenv-tzset/16162/2
 _VOID  _EXFUN(tzset,	(_VOID));
@@ -20,11 +21,11 @@ int	_EXFUN(setenv,(const char *__string, const char *__value, int __overwrite));
 
 // Version info
 #define MAJOR 1
-#define MINOR 2
+#define MINOR 3
 #define PATCH 0
 
 // Debug Info
-#define DEBUG 1
+//#define DEBUG 1
 void debug(int level, const char *fmt, ...);
 
 // Hardware board
@@ -52,8 +53,8 @@ PersistSettings<AppConfig> Settings(AppConfig::Version);
 Adafruit_MCP23X08 mcp;
 
 // Function Prototypes
-void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 255);
-uint32_t scalePwmOutput(float dataVal, float minScale, float maxScale, float gain = 1);
+void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax = 8191);
+uint32_t scalePwmOutput(double dataVal, double minScale, double maxScale, double halfScalePWM = 3600);
 uint8_t encodeWind(int windDir);
 void RunCalibration(void);
 
@@ -233,7 +234,6 @@ void setup() {
   // ==================================================
   esp_task_wdt_init(10, false);
   esp_task_wdt_add(NULL);
-  
 }
 
 // ##################################################################
@@ -429,19 +429,16 @@ void RunCalibration(void){
 
 // Analog PMW control, similar to Arduino analogWrite
 void ledcAnalogWrite(uint8_t channel, uint32_t value, uint32_t valueMax) {
-  // calculate duty, 8191 from 2 ^ 13 - 1
-  uint32_t duty = (8191 / valueMax) * min(value, valueMax);
-
-  // write duty to LEDC
-  ledcWrite(channel, duty);
+  // Write duty to LEDC, preventing writing above the max value
+  ledcWrite(channel, min(value, valueMax));
 }
 
 // Scale our guage values, as needed
-uint32_t scalePwmOutput(float dataVal, float minScale, float maxScale, float gain){
-  float fRange = maxScale - minScale;
-  float fScaler = 255 / fRange;
-  uint32_t u32Output = (dataVal - minScale) * fScaler * gain;
-  return min(u32Output, (uint32_t)255);
+uint32_t scalePwmOutput(double dataVal, double minScale, double maxScale, double halfScalePWM){
+  //double dRange = maxScale - minScale;
+  //double dScaler = 1 / dRange;
+  uint32_t u32Output = (uint32_t)floor(((dataVal - minScale) * halfScalePWM * (double)2) / (maxScale - minScale));
+  return min(u32Output, (uint32_t)8192);
 }
 
 // Encode wind direction to the output for the LED driver.
