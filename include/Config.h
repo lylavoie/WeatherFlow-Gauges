@@ -39,10 +39,10 @@ struct GaugeLampSettings{
 };
 
 struct AppConfig{
-    static const unsigned int Version = 3;
+    static const unsigned int Version = 4;
     WiFiSettings WiFi;
     GaugeSettings Wind = {0, 40, 10, 3900, 1};
-    GaugeSettings Temp = {-10, 150, 15, 3800, 1};
+    GaugeSettings Temp = {-10, 110, 15, 3680, 1};
     WebSettings Web = {"admin", "temp"};
     char TimeZone[32] = "EST+5EDT,M3.2.0/2,M11.1.0/2";
     GaugeLampSettings GaugeLamps;

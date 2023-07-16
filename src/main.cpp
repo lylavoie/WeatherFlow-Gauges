@@ -16,8 +16,8 @@
 #include <math.h>
 
 // Note, these are required because of https://community.platformio.org/t/identifier-is-undefined-setenv-tzset/16162/2
-_VOID  _EXFUN(tzset,	(_VOID));
-int	_EXFUN(setenv,(const char *__string, const char *__value, int __overwrite));
+//_VOID  _EXFUN(tzset,	(_VOID));
+//int	_EXFUN(setenv,(const char *__string, const char *__value, int __overwrite));
 
 // Version info
 #define MAJOR 1
@@ -25,7 +25,7 @@ int	_EXFUN(setenv,(const char *__string, const char *__value, int __overwrite));
 #define PATCH 0
 
 // Debug Info
-//#define DEBUG 1
+#define DEBUG 2
 void debug(int level, const char *fmt, ...);
 
 // Hardware board
@@ -353,7 +353,7 @@ void loop() {
     if( !bGaugeLamp && tmCurrentTime->tm_hour == Settings.Config.GaugeLamps.OnHour 
         && tmCurrentTime->tm_min == Settings.Config.GaugeLamps.OnMinute ){
       bGaugeLamp = true;
-      ledcAnalogWrite(LED1CHANNEL, scalePwmOutput(Settings.Config.GaugeLamps.LampBrightness, 0, 100, 1));
+      ledcAnalogWrite(LED1CHANNEL, scalePwmOutput(Settings.Config.GaugeLamps.LampBrightness, 0, 100, 4096));
     }
     if( bGaugeLamp && tmCurrentTime->tm_hour == Settings.Config.GaugeLamps.OffHour && 
         tmCurrentTime->tm_min == Settings.Config.GaugeLamps.OffMinute ){
@@ -399,16 +399,16 @@ void RunCalibration(void){
   uint32_t u32TempPwm;
   uint8_t u8WindDir;
 
-  u32WindPwm = scalePwmOutput(fWindSpeed, Settings.Config.Wind.min, 
-    Settings.Config.Wind.max, Settings.Config.Wind.gain);
+  u32WindPwm = scalePwmOutput((double)fWindSpeed, Settings.Config.Wind.min, 
+    Settings.Config.Wind.max, (double)Settings.Config.Wind.gain);
   debug(1, "\n\rWind PWM: %i", u32WindPwm);
   ledcAnalogWrite(WINDCHANNEL, u32WindPwm);
 
   fWindSpeed += Settings.Config.Wind.step;
   if( fWindSpeed > Settings.Config.Wind.max )fWindSpeed = Settings.Config.Wind.min;
 
-  u32TempPwm = scalePwmOutput(fAirTemp, Settings.Config.Temp.min, 
-    Settings.Config.Temp.max, Settings.Config.Temp.gain);
+  u32TempPwm = scalePwmOutput((double)fAirTemp, Settings.Config.Temp.min, 
+    Settings.Config.Temp.max, (double)Settings.Config.Temp.gain);
   debug(1, "\n\rTemp PWM: %i", u32TempPwm);
   ledcAnalogWrite(TEMPCHANNEL, u32TempPwm);
   
