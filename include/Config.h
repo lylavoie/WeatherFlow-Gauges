@@ -10,7 +10,7 @@ struct GaugeSettings{
     int min = 0;
     int max = 10;
     int step = 1;
-    float gain = 1;
+    float gain = 1;  // Gain is now the 50% PWM output integer
     int threshold = 0;
     GaugeSettings(int m1, int m2, int s, float g, int t){
         gain = g;
@@ -39,10 +39,10 @@ struct GaugeLampSettings{
 };
 
 struct AppConfig{
-    static const unsigned int Version = 1;
+    static const unsigned int Version = 4;
     WiFiSettings WiFi;
-    GaugeSettings Wind = {10, 50, 10, 0.93, 1};
-    GaugeSettings Temp = {-10, 150, 15, 0.88, 1};
+    GaugeSettings Wind = {0, 40, 10, 3900, 1};
+    GaugeSettings Temp = {-10, 110, 15, 3680, 1};
     WebSettings Web = {"admin", "temp"};
     char TimeZone[32] = "EST+5EDT,M3.2.0/2,M11.1.0/2";
     GaugeLampSettings GaugeLamps;
